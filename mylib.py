@@ -88,6 +88,7 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
              elapsed_time, idle_time):
     Load = True
     complete_tasks = []
+    failed_tasks = []
     time_taken_per_task = []
     while task_queue != []:
         curr_task = task_queue[0]
@@ -98,15 +99,27 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
         unloading_time = tasks_dictionary[curr_task][7]
         if Load == True:
             load_start = tasks_dictionary[curr_task][2] + elapsed_time
+            load_end = tasks_dictionary[curr_task][3] + elapsed_time
             move_time = adjacency_matrix[curr_pos][load_pos]
             elapsed_time = time_start + move_time
             if elapsed_time < load_start:
                 idle_time += load_start - elapsed_time
                 elapsed_time = load_start
-            elapsed_time += loading_time
-            idle_time += loading_time
-            curr_pos = load_pos
-            Load = False
+                elapsed_time += loading_time
+                idle_time += loading_time
+                curr_pos = load_pos
+                Load = False
+            elif elapsed_time >= load_start and elapsed_time <= load_end:
+                elapsed_time += loading_time
+                idle_time += loading_time
+                curr_pos = load_pos
+                Load = False
+            else:
+                idle_time += 99
+                elapsed_time += move_time
+                failed_tasks.append(task_queue[0])
+                task_queue.pop(0)
+
         else:
             unload_start = tasks_dictionary[curr_task][5] + elapsed_time
             move_time = adjacency_matrix[unload_pos][curr_pos]
