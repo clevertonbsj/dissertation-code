@@ -40,7 +40,12 @@ task_q = ml.order_queue(task_q, ela_time, Tasks)
 
 #time management
 
-ela_time, idle_time, complete_tasks, t_task, task_q = ml.do_tasks(start_pos, w,
+ela_time, idle_time, complete_tasks, t_task, task_q, failed = ml.do_tasks(start_pos, w,
                                                                   task_q, matrix, Tasks, ela_time, idle_time)
 
 ml.pareto(complete_tasks, t_task)
+if failed != []:
+    if len(failed) == 1:
+        print('The task', failed[0], 'has failed.')
+    else:
+        print('A total of', len(failed), 'tasks failed, they are: ', failed)
