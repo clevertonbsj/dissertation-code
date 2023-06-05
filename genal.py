@@ -34,18 +34,18 @@ task_q = ml.create_queue(50, 240, Tasks)
 here will go the code for assigning tasks to multiple agents
 
 '''
-
+print(task_q)
 #task management
-task_q = ml.order_queue(task_q, ela_time, Tasks)
+task_q = ml.Genetic(start_pos, w, task_q, matrix, Tasks, ela_time, idle_time)
 
+print(task_q)
 #time management
 
-ela_time, idle_time, complete_tasks, t_task, task_q, failed = ml.do_tasks(start_pos, w,
-                                                                  task_q, matrix, Tasks, ela_time, idle_time)
+#ela_time, idle_time, complete_tasks, t_task, task_q, failed = ml.do_tasks(
 
-ml.pareto(complete_tasks, t_task)
-if failed != []:
-    if len(failed) == 1:
-        print('The task', failed[0], 'has failed.')
-    else:
-        print('A total of', len(failed), 'tasks failed, they are: ', failed)
+#ml.pareto(complete_tasks, t_task)
+#if failed != []:
+#    if len(failed) == 1:
+#        print('The task', failed[0], 'has failed.')
+#    else:
+#        print('A total of', len(failed), 'tasks failed, they are: ', failed)

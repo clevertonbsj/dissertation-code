@@ -8,7 +8,7 @@ import random as rd
 import numpy as np
 import networkx as nx
 import matplotlib as plt
-
+import mlrose_hiive as mh
 
 def create_graph(warehouse_number, delivery_number):
     '''creating the weighted adjacency matrix and squaring it'''
@@ -198,6 +198,112 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
                 Load = True
                 
     return elapsed_time, idle_time, complete_tasks, time_taken_per_task, task_queue, failed_tasks
+
+
+def do_tasks_fit(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dictionary,
+             elapsed_time, idle_time):
+    Load = True
+    time_start = elapsed_time
+    i = 0
+   # task_queue = [x for _,x in sorted(zip(order, task_queue))]
+    '''
+    doing the tasks and verifying if they arrived during the intended time windows
+    '''
+    while i < len(task_queue): #keeps the function running while going through task queue
+        curr_task = task_queue[0]
+        load_pos = tasks_dictionary[curr_task][0]
+        unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
+        loading_time = tasks_dictionary[curr_task][4]
+        unloading_time = tasks_dictionary[curr_task][7]
+        
+        #checking if we should load the product on the AGV
+        
+        if Load == True:
+            load_start = tasks_dictionary[curr_task][2] + elapsed_time
+            load_end = tasks_dictionary[curr_task][3] + elapsed_time
+            move_time = adjacency_matrix[curr_pos][load_pos]
+            elapsed_time = time_start + move_time
+        
+            #checking if the AGV arrived before the opening of the load window
+            #if it did it stays there until the opening of the window
+            
+            if elapsed_time < load_start:
+                idle_time += load_start - elapsed_time
+                elapsed_time = load_start
+                elapsed_time += loading_time
+                idle_time += loading_time
+                curr_pos = load_pos
+                Load = False
+            
+            #checking if the AGV arrived during it's intended loading window
+            #if it did the task proceeds as usual
+            
+            elif elapsed_time >= load_start and elapsed_time <= load_end:
+                elapsed_time += loading_time
+                idle_time += loading_time
+                curr_pos = load_pos
+                Load = False
+            
+            #checking if the AGV failed to arrive during it's time window
+            #if it did it returns to the neutral point (node 0) while adding a 
+            #penalty to it's idling time
+            
+            else:
+                idle_time += 99
+                elapsed_time += 2 * move_time
+                i += 1
+
+
+        else:
+            unload_start = tasks_dictionary[curr_task][5] + elapsed_time
+            unload_end = tasks_dictionary[curr_task][6] + elapsed_time
+            move_time = adjacency_matrix[unload_pos][curr_pos]
+            elapsed_time = time_start + move_time
+            
+            #checking if the AGV arrived before the opening of the unloading window
+            #if it did it stays there until the opening of the window and add
+            #the time taken to complete the task and the completed tasks to their
+            #respective lists
+            
+            if elapsed_time < unload_start:
+                idle_time += unload_start - elapsed_time
+                elapsed_time = unload_start
+                elapsed_time += unloading_time
+                idle_time += unloading_time
+                curr_pos = unload_pos
+                i += 1
+                time_start += elapsed_time
+                Load = True
+                
+                
+            #checking if the AGV arrived during it's intended unloading window
+            #if it did the task proceeds as usual and add the time taken to 
+            #complete the task and the completed tasks to their respective lists
+                
+            elif elapsed_time >= unload_start and elapsed_time <= unload_end:
+                elapsed_time += unloading_time
+                idle_time += unloading_time
+                curr_pos = unload_pos
+                i += 1
+                time_start += elapsed_time
+                Load = True
+                
+            #checking if the AGV failed to arrive during it's time window
+            #if it did it returns to the neutral point (node 0) while adding a 
+            #penalty to it's idling time and adding the current taskt to the 
+            #list of failed tasks
+            
+            else:
+                idle_time += 99
+                elapsed_time += 2 * move_time + loading_time +\
+                    adjacency_matrix[0][load_pos]
+                i += 1
+                time_start += elapsed_time
+                curr_pos = 0
+                Load = True
+                
+    return idle_time
+
         
 def pareto(complete_tasks, time_taken_per_task):
    
@@ -239,6 +345,129 @@ def pareto(complete_tasks, time_taken_per_task):
     ax2.tick_params(axis="y", colors="C1")
     plt.pyplot.show()
         
-    
+class Individual():
+    def __init__(self, idle, tasks, generation = 0):
+        self.idle = idle
+        self.tasks = tasks
+        self.score_evaluation = 0
+        self.generation = generation
+        self.chromossome = []
+        
+        #creating the initial chromossome with the initial task order
+        for i in range(tasks):
+            self.chromossome.append(i)
+        
+    #creating the fitness function
+    def fitness(self, curr_pos, warehouse_number, adjacency_matrix, 
+                tasks_dictionary, elapsed_time):
+        score = 0
+        Load = True
+        time_start = elapsed_time
+        i = 0
+        task_queue = [x for _,x in sorted(zip(self.chromossome, self.tasks))]
+
+        while i < len(task_queue): #keeps the function running while going through task queue
+            curr_task = task_queue[0]
+            load_pos = tasks_dictionary[curr_task][0]
+            unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
+            loading_time = tasks_dictionary[curr_task][4]
+            unloading_time = tasks_dictionary[curr_task][7]
+            
+            #checking if we should load the product on the AGV
+            
+            if Load == True:
+                load_start = tasks_dictionary[curr_task][2] + elapsed_time
+                load_end = tasks_dictionary[curr_task][3] + elapsed_time
+                move_time = adjacency_matrix[curr_pos][load_pos]
+                elapsed_time = time_start + move_time
+            
+                #checking if the AGV arrived before the opening of the load window
+                #if it did it stays there until the opening of the window
+                
+                if elapsed_time < load_start:
+                    score += load_start - elapsed_time
+                    elapsed_time = load_start
+                    elapsed_time += loading_time
+                    score += loading_time
+                    curr_pos = load_pos
+                    Load = False
+                
+                #checking if the AGV arrived during it's intended loading window
+                #if it did the task proceeds as usual
+                
+                elif elapsed_time >= load_start and elapsed_time <= load_end:
+                    elapsed_time += loading_time
+                    score += loading_time
+                    curr_pos = load_pos
+                    Load = False
+                
+                #checking if the AGV failed to arrive during it's time window
+                #if it did it returns to the neutral point (node 0) while adding a 
+                #penalty to it's score
+                
+                else:
+                    score += 99
+                    elapsed_time += 2 * move_time
+                    i += 1
 
 
+            else:
+                unload_start = tasks_dictionary[curr_task][5] + elapsed_time
+                unload_end = tasks_dictionary[curr_task][6] + elapsed_time
+                move_time = adjacency_matrix[unload_pos][curr_pos]
+                elapsed_time = time_start + move_time
+                
+                #checking if the AGV arrived before the opening of the unloading window
+                #if it did it stays there until the opening of the window and add
+                #the time taken to complete the task and the completed tasks to their
+                #respective lists
+                
+                if elapsed_time < unload_start:
+                    score += unload_start - elapsed_time
+                    elapsed_time = unload_start
+                    elapsed_time += unloading_time
+                    score += unloading_time
+                    curr_pos = unload_pos
+                    i += 1
+                    time_start += elapsed_time
+                    Load = True
+                    
+                    
+                #checking if the AGV arrived during it's intended unloading window
+                #if it did the task proceeds as usual and add the time taken to 
+                #complete the task and the completed tasks to their respective lists
+                    
+                elif elapsed_time >= unload_start and elapsed_time <= unload_end:
+                    elapsed_time += unloading_time
+                    score += unloading_time
+                    curr_pos = unload_pos
+                    i += 1
+                    time_start += elapsed_time
+                    Load = True
+                    
+                #checking if the AGV failed to arrive during it's time window
+                #if it did it returns to the neutral point (node 0) while adding a 
+                #penalty to it's score
+                
+                else:
+                    score += 99
+                    elapsed_time += 2 * move_time + loading_time +\
+                        adjacency_matrix[0][load_pos]
+                    i += 1
+                    time_start += elapsed_time
+                    curr_pos = 0
+                    Load = True
+                self.score_evaluation = score
+'''
+  #creating the crossover function
+    def crossover(self, other_individual):
+        cutoff = round(rd.random() * len(self.chromosome))
+
+        child1 = other_individual.chromosome[0:cutoff] + self.chromosome[cutoff::]
+        child2 = self.chromosome[0:cutoff] + other_individual.chromosome[cutoff::]
+        children = [Individual(self.spaces, self.prices, self.space_limit, self.generation + 1),
+                    Individual(self.spaces, self.prices, self.space_limit, self.generation + 1)]
+        children[0].chromosome = child1
+        children[1].chromosome = child2
+        return children 
+'''    

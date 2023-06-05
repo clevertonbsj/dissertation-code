@@ -4,7 +4,7 @@ import numpy as np
 #from deap import creator
 #from deap import algorithms
 #from deap import tools
-import random as rd
+#import random as rd
 import plotly.io as pio
 import plotly.express as px
 import mlrose_hiive as mlrose
@@ -102,7 +102,6 @@ for i in range(len(best_sol_array)):
     if best_sol_array[i] == 1:
         print('Name: ', prodlist[i][0],
               '- Price: ', prodlist[i][2])
-
-pio.renderers.default = 'svg'
+#pio.renderers.default = 'svg'
 #figure = px.line(x = range(0, 101), y = info.select('Max'), title = 'Genetic Algorithm results')
 #figure.show()
