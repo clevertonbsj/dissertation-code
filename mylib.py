@@ -8,7 +8,7 @@ import random as rd
 import numpy as np
 import networkx as nx
 import matplotlib as plt
-import mlrose_hiive as mh
+
 
 def create_graph(warehouse_number, delivery_number):
     '''creating the weighted adjacency matrix and squaring it'''
@@ -353,10 +353,14 @@ class Individual():
         self.generation = generation
         self.chromossome = []
         
-        #creating the initial chromossome with the initial task order
-        for i in range(tasks):
+        #creating the initial chromossome with a random task order
+        for i in range(len(tasks)):
             self.chromossome.append(i)
         
+        for i in range(len(tasks)): #randomly swapping chromossome positions
+            rand = abs(rd.randint(0, len(tasks)-1))
+            self.chromossome[i], self.chromossome[rand] = \
+                self.chromossome[rand], self.chromossome[i]
     #creating the fitness function
     def fitness(self, curr_pos, warehouse_number, adjacency_matrix, 
                 tasks_dictionary, elapsed_time):
@@ -458,16 +462,59 @@ class Individual():
                     curr_pos = 0
                     Load = True
                 self.score_evaluation = score
-'''
+
   #creating the crossover function
     def crossover(self, other_individual):
-        cutoff = round(rd.random() * len(self.chromosome))
+        size = len(self.chromossome)
+        
+        #choosing random start and end positions for the crossover
+        start, end = sorted([rd.randrange(size) for _ in range(2)])
+        
+        #replicating the chromossome into the children
+        child1, child2 = [-1] * size, [-1] * size #signalling empty positions
+        child1_inh, child2_inh = [], [] #lists for the inherited genes
+        for i in range(start, end+1):
+            child1[i] = self.chromossome[i]
+            child2[i] = other_individual.chromossome[i]
+            child1_inh.append(self.chromossome[i])
+            child2_inh.append(other_individual.chromossome[i])
+        
+        #doing the actual crossover
+        curr_p1_pos, curr_p2_pos = 0, 0
+        fixed_pos = list(range(start, end+1))
+        
+        i=0
+        while i < size:
+            if i in fixed_pos:
+                i+=1
+                continue
+            curr_gene1  = child1[i] 
+            if curr_gene1 == -1: #current gene of the first child is empty
+                p2_trait = other_individual.chromossome[i]
+                while p2_trait in child1_inh: #checking if the current gene is already inherited
+                    curr_p2_pos += 1
+                    p2_trait = other_individual.chromossome[curr_p2_pos]
+                child1[i] = p2_trait
+                child1_inh.append(p2_trait)
+            curr_gene2 = child2[i]
+            if curr_gene2 == -1: #current gene of the second child is empty
+                p1_trait = self.chromossome[i]
+                while p1_trait in child2_inh: #checking if the current gene is already inherited
+                    curr_p1_pos += 1
+                    p1_trait = self.chromossome[curr_p1_pos]
+                child2[i] = p1_trait
+                child2_inh.append(p1_trait)
+            
+            i+=1
+        
+        return child1, child2
+    
+    #creating the mutation function
+    def mutation(self, rate):
+        for i in range(len(self.chromossome)):
+            if rd.random() < rate: #verifying if mutation occurs
+                rand = abs(rd.randint(0, len(self.chromossome)-1)) 
+                self.chromossome[i], self.chromossome[rand] = \
+                    self.chromossome[rand], self.chromossome[i] #swapping random positions of the chromossome as a mutation
+        return self
 
-        child1 = other_individual.chromosome[0:cutoff] + self.chromosome[cutoff::]
-        child2 = self.chromosome[0:cutoff] + other_individual.chromosome[cutoff::]
-        children = [Individual(self.spaces, self.prices, self.space_limit, self.generation + 1),
-                    Individual(self.spaces, self.prices, self.space_limit, self.generation + 1)]
-        children[0].chromosome = child1
-        children[1].chromosome = child2
-        return children 
-'''    
