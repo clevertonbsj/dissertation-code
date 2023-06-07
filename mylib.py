@@ -76,7 +76,7 @@ def create_queue(queue_max_size, time_slot_minutes, Task_dictionary):
         task_times.pop()
     return task_q
 
-def order_queue(task_q, elapsed_time, Task_dictionary):
+def order_queue_edd(task_q, elapsed_time, Task_dictionary):
     task_q_ord = []
     tasks_dues = []
     '''
@@ -88,6 +88,10 @@ def order_queue(task_q, elapsed_time, Task_dictionary):
     task_q_ord = [x for _,x in sorted(zip(tasks_dues, task_q))]
     return task_q_ord
 
+
+def order_queue(task_queue, task_order):
+    task_queue = [x for _,x in sorted(zip(task_order, task_queue))]
+    return task_queue
 
 def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dictionary,
              elapsed_time, idle_time):
@@ -200,111 +204,6 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
     return elapsed_time, idle_time, complete_tasks, time_taken_per_task, task_queue, failed_tasks
 
 
-def do_tasks_fit(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dictionary,
-             elapsed_time, idle_time):
-    Load = True
-    time_start = elapsed_time
-    i = 0
-   # task_queue = [x for _,x in sorted(zip(order, task_queue))]
-    '''
-    doing the tasks and verifying if they arrived during the intended time windows
-    '''
-    while i < len(task_queue): #keeps the function running while going through task queue
-        curr_task = task_queue[0]
-        load_pos = tasks_dictionary[curr_task][0]
-        unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
-        loading_time = tasks_dictionary[curr_task][4]
-        unloading_time = tasks_dictionary[curr_task][7]
-        
-        #checking if we should load the product on the AGV
-        
-        if Load == True:
-            load_start = tasks_dictionary[curr_task][2] + elapsed_time
-            load_end = tasks_dictionary[curr_task][3] + elapsed_time
-            move_time = adjacency_matrix[curr_pos][load_pos]
-            elapsed_time = time_start + move_time
-        
-            #checking if the AGV arrived before the opening of the load window
-            #if it did it stays there until the opening of the window
-            
-            if elapsed_time < load_start:
-                idle_time += load_start - elapsed_time
-                elapsed_time = load_start
-                elapsed_time += loading_time
-                idle_time += loading_time
-                curr_pos = load_pos
-                Load = False
-            
-            #checking if the AGV arrived during it's intended loading window
-            #if it did the task proceeds as usual
-            
-            elif elapsed_time >= load_start and elapsed_time <= load_end:
-                elapsed_time += loading_time
-                idle_time += loading_time
-                curr_pos = load_pos
-                Load = False
-            
-            #checking if the AGV failed to arrive during it's time window
-            #if it did it returns to the neutral point (node 0) while adding a 
-            #penalty to it's idling time
-            
-            else:
-                idle_time += 99
-                elapsed_time += 2 * move_time
-                i += 1
-
-
-        else:
-            unload_start = tasks_dictionary[curr_task][5] + elapsed_time
-            unload_end = tasks_dictionary[curr_task][6] + elapsed_time
-            move_time = adjacency_matrix[unload_pos][curr_pos]
-            elapsed_time = time_start + move_time
-            
-            #checking if the AGV arrived before the opening of the unloading window
-            #if it did it stays there until the opening of the window and add
-            #the time taken to complete the task and the completed tasks to their
-            #respective lists
-            
-            if elapsed_time < unload_start:
-                idle_time += unload_start - elapsed_time
-                elapsed_time = unload_start
-                elapsed_time += unloading_time
-                idle_time += unloading_time
-                curr_pos = unload_pos
-                i += 1
-                time_start += elapsed_time
-                Load = True
-                
-                
-            #checking if the AGV arrived during it's intended unloading window
-            #if it did the task proceeds as usual and add the time taken to 
-            #complete the task and the completed tasks to their respective lists
-                
-            elif elapsed_time >= unload_start and elapsed_time <= unload_end:
-                elapsed_time += unloading_time
-                idle_time += unloading_time
-                curr_pos = unload_pos
-                i += 1
-                time_start += elapsed_time
-                Load = True
-                
-            #checking if the AGV failed to arrive during it's time window
-            #if it did it returns to the neutral point (node 0) while adding a 
-            #penalty to it's idling time and adding the current taskt to the 
-            #list of failed tasks
-            
-            else:
-                idle_time += 99
-                elapsed_time += 2 * move_time + loading_time +\
-                    adjacency_matrix[0][load_pos]
-                i += 1
-                time_start += elapsed_time
-                curr_pos = 0
-                Load = True
-                
-    return idle_time
-
-        
 def pareto(complete_tasks, time_taken_per_task):
    
     '''paretizing the data for ease of reading'''
@@ -346,11 +245,17 @@ def pareto(complete_tasks, time_taken_per_task):
     plt.pyplot.show()
         
 class Individual():
-    def __init__(self, idle, tasks, generation = 0):
+    def __init__(self, idle, tasks, current_position, warehouse_number, adjacency_matrix,
+                 tasks_dictionary, elapsed_time, generation = 0):
         self.idle = idle
         self.tasks = tasks
         self.score_evaluation = 0
         self.generation = generation
+        self.current_position = current_position
+        self.warehouse_number = warehouse_number
+        self.adjacency_matrix = adjacency_matrix
+        self.tasks_dictionary = tasks_dictionary
+        self.elapsed_time = elapsed_time
         self.chromossome = []
         
         #creating the initial chromossome with a random task order
@@ -362,27 +267,28 @@ class Individual():
             self.chromossome[i], self.chromossome[rand] = \
                 self.chromossome[rand], self.chromossome[i]
     #creating the fitness function
-    def fitness(self, curr_pos, warehouse_number, adjacency_matrix, 
-                tasks_dictionary, elapsed_time):
+    def fitness(self):
         score = 0
         Load = True
-        time_start = elapsed_time
+        time_start = self.elapsed_time
         i = 0
         task_queue = [x for _,x in sorted(zip(self.chromossome, self.tasks))]
+        curr_pos = self.current_position
+        elapsed_time = self.elapsed_time
 
         while i < len(task_queue): #keeps the function running while going through task queue
-            curr_task = task_queue[0]
-            load_pos = tasks_dictionary[curr_task][0]
-            unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
-            loading_time = tasks_dictionary[curr_task][4]
-            unloading_time = tasks_dictionary[curr_task][7]
+            curr_task = self.tasks[i]
+            load_pos = self.tasks_dictionary[curr_task][0]
+            unload_pos = self.tasks_dictionary[curr_task][1] + self.warehouse_number  
+            loading_time = self.tasks_dictionary[curr_task][4]
+            unloading_time = self.tasks_dictionary[curr_task][7]
             
             #checking if we should load the product on the AGV
             
             if Load == True:
-                load_start = tasks_dictionary[curr_task][2] + elapsed_time
-                load_end = tasks_dictionary[curr_task][3] + elapsed_time
-                move_time = adjacency_matrix[curr_pos][load_pos]
+                load_start = self.tasks_dictionary[curr_task][2] + elapsed_time
+                load_end = self.tasks_dictionary[curr_task][3] + elapsed_time
+                move_time = self.adjacency_matrix[curr_pos][load_pos]
                 elapsed_time = time_start + move_time
             
                 #checking if the AGV arrived before the opening of the load window
@@ -416,9 +322,9 @@ class Individual():
 
 
             else:
-                unload_start = tasks_dictionary[curr_task][5] + elapsed_time
-                unload_end = tasks_dictionary[curr_task][6] + elapsed_time
-                move_time = adjacency_matrix[unload_pos][curr_pos]
+                unload_start = self.tasks_dictionary[curr_task][5] + elapsed_time
+                unload_end = self.tasks_dictionary[curr_task][6] + elapsed_time
+                move_time = self.adjacency_matrix[unload_pos][curr_pos]
                 elapsed_time = time_start + move_time
                 
                 #checking if the AGV arrived before the opening of the unloading window
@@ -456,12 +362,12 @@ class Individual():
                 else:
                     score += 99
                     elapsed_time += 2 * move_time + loading_time +\
-                        adjacency_matrix[0][load_pos]
+                        self.adjacency_matrix[0][load_pos]
                     i += 1
                     time_start += elapsed_time
                     curr_pos = 0
                     Load = True
-                self.score_evaluation = score
+        self.score_evaluation = score
 
   #creating the crossover function
     def crossover(self, other_individual):
@@ -493,7 +399,10 @@ class Individual():
                 p2_trait = other_individual.chromossome[i]
                 while p2_trait in child1_inh: #checking if the current gene is already inherited
                     curr_p2_pos += 1
+                    if curr_p2_pos >= size:
+                        break
                     p2_trait = other_individual.chromossome[curr_p2_pos]
+                    
                 child1[i] = p2_trait
                 child1_inh.append(p2_trait)
             curr_gene2 = child2[i]
@@ -501,12 +410,14 @@ class Individual():
                 p1_trait = self.chromossome[i]
                 while p1_trait in child2_inh: #checking if the current gene is already inherited
                     curr_p1_pos += 1
+                    if curr_p1_pos >= size:
+                        break
                     p1_trait = self.chromossome[curr_p1_pos]
                 child2[i] = p1_trait
                 child2_inh.append(p1_trait)
             
             i+=1
-        
+        print(child1, child2)
         return child1, child2
     
     #creating the mutation function
@@ -518,3 +429,99 @@ class Individual():
                     self.chromossome[rand], self.chromossome[i] #swapping random positions of the chromossome as a mutation
         return self
 
+class GeneticAlgorithm():
+    def __init__(self, population_size):
+        self.population_size = population_size
+        self.population = []
+        self.generation = 0
+        self.best_sol = None
+        self.list_of_solutions = []
+        
+    #creating a function to initialize the population
+    def init_pop(self, idle, tasks, current_position, warehouse_number, 
+                 adjacency_matrix, tasks_dictionary, elapsed_time):
+        for i in range(self.population_size):
+            self.population.append(Individual(idle, tasks, current_position, 
+                                              warehouse_number, adjacency_matrix, 
+                                              tasks_dictionary, elapsed_time))
+        self.best_sol = self.population[0]
+    
+    #creating the best individual function
+    def best_individual(self, individual):
+        if individual.score_evaluation < self.best_sol.score_evaluation:
+            self.best_sol = individual
+            
+    #creating a function to order the population based on their scores
+    def order_population(self):
+        self.population = sorted(self.population, key = lambda population: \
+                                 population.score_evaluation)
+        
+    #creating a function to do the sum of the evaluation
+    def sum_evaluation(self):
+        sum = 0 
+        for individual in self.population:
+            sum += individual.score_evaluation
+        return sum
+    
+    #creating the function to select the parents
+    def select_parents(self, sum_evaluation):
+        parent = -1
+        rand = rd.random() * sum_evaluation
+        sum = 0
+        i = 0
+        while i < len(self.population) and sum < rand:
+            sum += self.population[i].score_evaluation
+            parent += 1
+            i += 1
+        return parent
+    
+    #creating the function to visualize the generation
+
+
+    #creating the solving function
+    def solve(self, mutation_probability, number_of_generations, idle, tasks,
+              curr_pos, warehouse_number, adjacency_matrix, tasks_dictionary, 
+              elapsed_time):
+        self.init_pop(idle, tasks, curr_pos, warehouse_number, adjacency_matrix,
+                      tasks_dictionary, elapsed_time)
+        for individual in self.population:
+            individual.fitness()
+            print(individual.chromossome, individual.score_evaluation)
+        self.order_population()
+        for generation in range(number_of_generations):
+            sum = self.sum_evaluation()
+            new_population = []
+            for individual in range(0, self.population_size, 2):
+                p1 = self.select_parents(sum)
+                p2 = self.select_parents(sum)
+                children = self.population[p1].crossover(self.population[p2])
+                new_population.append(children[0])
+                new_population.append(children[1])
+            self.population = new_population
+            for individual in self.population:
+                individual.fitness()
+            self.order_population()
+            best = self.population[0]
+            self.list_of_solutions.append(best.score_evaluation)
+            self.best_individual(best)
+            print('Best Solution - Generation', best.generation,
+                  'Idling Time', best.score_evaluation,
+                  'Chromossome', best.chromossome)
+        return self.chromossome
+                
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

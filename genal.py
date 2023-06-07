@@ -36,9 +36,12 @@ here will go the code for assigning tasks to multiple agents
 '''
 print(task_q)
 #task management
-task_q = ml.Genetic(start_pos, w, task_q, matrix, Tasks, ela_time, idle_time)
+pop_size, n_gen, mut_prob = 100, 500, 0.01
+ga = ml.GeneticAlgorithm(pop_size)
+task_order = ga.solve(mut_prob, n_gen, idle_time, task_q, start_pos, w, matrix,
+                      Tasks, ela_time)
+task_q = ml.order_queue(task_q, task_order)
 
-print(task_q)
 #time management
 
 #ela_time, idle_time, complete_tasks, t_task, task_q, failed = ml.do_tasks(
