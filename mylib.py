@@ -367,7 +367,7 @@ class Individual():
                     time_start += elapsed_time
                     curr_pos = 0
                     Load = True
-        self.score_evaluation = score
+        self.score_evaluation = elapsed_time + score
 
   #creating the crossover function
     def crossover(self, other_individual):
@@ -417,8 +417,15 @@ class Individual():
                 child2_inh.append(p1_trait)
             
             i+=1
-        print(child1, child2)
-        return child1, child2
+        children = [Individual(self.idle, self.tasks, self.current_position, 
+                               self.warehouse_number, self.adjacency_matrix, 
+                               self.tasks_dictionary, self.elapsed_time, self.generation+1),
+                    Individual(self.idle, self.tasks, self.current_position, 
+                               self.warehouse_number, self.adjacency_matrix, 
+                               self.tasks_dictionary, self.elapsed_time, self.generation+1)]
+        children[0].chromossome = child1
+        children[1].chromossome = child2
+        return children
     
     #creating the mutation function
     def mutation(self, rate):
@@ -486,7 +493,6 @@ class GeneticAlgorithm():
                       tasks_dictionary, elapsed_time)
         for individual in self.population:
             individual.fitness()
-            print(individual.chromossome, individual.score_evaluation)
         self.order_population()
         for generation in range(number_of_generations):
             sum = self.sum_evaluation()
@@ -504,10 +510,12 @@ class GeneticAlgorithm():
             best = self.population[0]
             self.list_of_solutions.append(best.score_evaluation)
             self.best_individual(best)
-            print('Best Solution - Generation', best.generation,
-                  'Idling Time', best.score_evaluation,
-                  'Chromossome', best.chromossome)
-        return self.chromossome
+        for individual in self.population:
+            print(individual.score_evaluation)
+        print('Best Solution - Generation', best.generation,
+              'Idling Time', best.score_evaluation,
+              'Chromossome', best.chromossome)
+        return best.chromossome
                 
         
         
