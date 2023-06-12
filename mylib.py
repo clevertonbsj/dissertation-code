@@ -114,7 +114,7 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
         
         if Load == True:
             load_start = tasks_dictionary[curr_task][2] + elapsed_time
-            load_end = tasks_dictionary[curr_task][3] + elapsed_time
+            load_end = tasks_dictionary[curr_task][3] + load_start
             move_time = adjacency_matrix[curr_pos][load_pos]
             elapsed_time = time_start + move_time
         
@@ -150,7 +150,7 @@ def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dic
 
         else:
             unload_start = tasks_dictionary[curr_task][5] + elapsed_time
-            unload_end = tasks_dictionary[curr_task][6] + elapsed_time
+            unload_end = tasks_dictionary[curr_task][6] + unload_start
             move_time = adjacency_matrix[unload_pos][curr_pos]
             elapsed_time = time_start + move_time
             
@@ -268,7 +268,7 @@ class Individual():
                 self.chromossome[rand], self.chromossome[i]
     #creating the fitness function
     def fitness(self):
-        score = 0
+        idle = 0
         Load = True
         time_start = self.elapsed_time
         i = 0
@@ -277,7 +277,7 @@ class Individual():
         elapsed_time = self.elapsed_time
 
         while i < len(task_queue): #keeps the function running while going through task queue
-            curr_task = self.tasks[i]
+            curr_task = task_queue[i]
             load_pos = self.tasks_dictionary[curr_task][0]
             unload_pos = self.tasks_dictionary[curr_task][1] + self.warehouse_number  
             loading_time = self.tasks_dictionary[curr_task][4]
@@ -287,7 +287,7 @@ class Individual():
             
             if Load == True:
                 load_start = self.tasks_dictionary[curr_task][2] + elapsed_time
-                load_end = self.tasks_dictionary[curr_task][3] + elapsed_time
+                load_end = self.tasks_dictionary[curr_task][3] + load_start
                 move_time = self.adjacency_matrix[curr_pos][load_pos]
                 elapsed_time = time_start + move_time
             
@@ -295,10 +295,10 @@ class Individual():
                 #if it did it stays there until the opening of the window
                 
                 if elapsed_time < load_start:
-                    score += load_start - elapsed_time
+                    idle += load_start - elapsed_time
                     elapsed_time = load_start
                     elapsed_time += loading_time
-                    score += loading_time
+                    idle += loading_time
                     curr_pos = load_pos
                     Load = False
                 
@@ -307,7 +307,7 @@ class Individual():
                 
                 elif elapsed_time >= load_start and elapsed_time <= load_end:
                     elapsed_time += loading_time
-                    score += loading_time
+                    idle += loading_time
                     curr_pos = load_pos
                     Load = False
                 
@@ -316,27 +316,26 @@ class Individual():
                 #penalty to it's score
                 
                 else:
-                    score += 99
+                    idle += 99
                     elapsed_time += 2 * move_time
                     i += 1
 
 
             else:
                 unload_start = self.tasks_dictionary[curr_task][5] + elapsed_time
-                unload_end = self.tasks_dictionary[curr_task][6] + elapsed_time
+                unload_end = self.tasks_dictionary[curr_task][6] + unload_start
                 move_time = self.adjacency_matrix[unload_pos][curr_pos]
                 elapsed_time = time_start + move_time
-                
                 #checking if the AGV arrived before the opening of the unloading window
                 #if it did it stays there until the opening of the window and add
                 #the time taken to complete the task and the completed tasks to their
                 #respective lists
                 
                 if elapsed_time < unload_start:
-                    score += unload_start - elapsed_time
+                    idle += unload_start - elapsed_time
                     elapsed_time = unload_start
                     elapsed_time += unloading_time
-                    score += unloading_time
+                    idle += unloading_time
                     curr_pos = unload_pos
                     i += 1
                     time_start += elapsed_time
@@ -349,7 +348,7 @@ class Individual():
                     
                 elif elapsed_time >= unload_start and elapsed_time <= unload_end:
                     elapsed_time += unloading_time
-                    score += unloading_time
+                    idle += unloading_time
                     curr_pos = unload_pos
                     i += 1
                     time_start += elapsed_time
@@ -360,14 +359,14 @@ class Individual():
                 #penalty to it's score
                 
                 else:
-                    score += 99
+                    idle += 99
                     elapsed_time += 2 * move_time + loading_time +\
                         self.adjacency_matrix[0][load_pos]
                     i += 1
                     time_start += elapsed_time
                     curr_pos = 0
                     Load = True
-        self.score_evaluation = elapsed_time + score
+        self.score_evaluation = elapsed_time + idle
 
   #creating the crossover function
     def crossover(self, other_individual):
@@ -463,6 +462,7 @@ class GeneticAlgorithm():
         self.population = sorted(self.population, key = lambda population: \
                                  population.score_evaluation)
         
+        
     #creating a function to do the sum of the evaluation
     def sum_evaluation(self):
         sum = 0 
@@ -489,6 +489,7 @@ class GeneticAlgorithm():
     def solve(self, mutation_probability, number_of_generations, idle, tasks,
               curr_pos, warehouse_number, adjacency_matrix, tasks_dictionary, 
               elapsed_time):
+        
         self.init_pop(idle, tasks, curr_pos, warehouse_number, adjacency_matrix,
                       tasks_dictionary, elapsed_time)
         for individual in self.population:
@@ -510,12 +511,11 @@ class GeneticAlgorithm():
             best = self.population[0]
             self.list_of_solutions.append(best.score_evaluation)
             self.best_individual(best)
-        for individual in self.population:
-            print(individual.score_evaluation)
-        print('Best Solution - Generation', best.generation,
-              'Idling Time', best.score_evaluation,
-              'Chromossome', best.chromossome)
-        return best.chromossome
+            #print(best.chromossome, best.score_evaluation, best.generation)
+        print('Best Solution - Generation', self.best_sol.generation,
+              'Score', self.best_sol.score_evaluation,
+              'Chromossome', self.best_sol.chromossome)
+        return self.best_sol.chromossome
                 
         
         
