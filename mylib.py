@@ -8,6 +8,8 @@ import random as rd
 import numpy as np
 import networkx as nx
 import matplotlib as plt
+import pytorch as pt
+import tensorflow as tf
 
 
 def create_graph(warehouse_number, delivery_number):
@@ -517,19 +519,29 @@ class GeneticAlgorithm():
               'Chromossome', self.best_sol.chromossome)
         return self.best_sol.chromossome
                 
+class brain():
+    def __init__(self):
+        self.bias = []
+        self.dues = []
+        self.input_vector = []
+        self.elapsed_time = 0
+        self.current_position = 0
         
+    def init_brain(self, tasks, task_dict):
+        for i in tasks:
+            self.dues.append(task_dict[i][3])
+            self.bias.append(1)
+    
+    def inputs(self):
+        for i in range(len(self.dues)-1):
+            self.input_vector.append(self.dues[i]/max(self.dues))
+            self.input_vector.append(self.bias[i]/max(self.bias))
+        self.input_vector.append(self.current_position)
+    
+    def refresh(self, elapsed_time, current_position, task_dict, tasks):
+        self.elapsed_time = elapsed_time
+        self.current_position = current_position
+
+    def neural_net(self):
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+    
