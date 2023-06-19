@@ -59,7 +59,7 @@ ela_time, idle_time, complete_tasks, t_task, task_q, failed = \
 for i in failed:
     idle_time -= 99
 
-ml.pareto(complete_tasks, t_task)
+#ml.pareto(complete_tasks, t_task)
 if failed != []:
     if len(failed) == 1:
         print('The task', failed[0], 'has failed.')

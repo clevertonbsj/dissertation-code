@@ -8,9 +8,13 @@ import random as rd
 import numpy as np
 import networkx as nx
 import matplotlib as plt
-import pytorch as pt
-import tensorflow as tf
-
+import os
+import torch
+import torch.nn as nn
+import torch.nn.functional as func
+import torch.optim as optim
+import torch.autograd as autograd
+from torch.autograd import Variable
 
 def create_graph(warehouse_number, delivery_number):
     '''creating the weighted adjacency matrix and squaring it'''
@@ -290,7 +294,7 @@ class Individual():
             if Load == True:
                 load_start = self.tasks_dictionary[curr_task][2] + elapsed_time
                 load_end = self.tasks_dictionary[curr_task][3] + load_start
-                move_time = self.adjacency_matrix[curr_pos][load_pos]
+                move_time = self.adjacency_matrix[curr_pos][load_pos] 
                 elapsed_time = time_start + move_time
             
                 #checking if the AGV arrived before the opening of the load window
@@ -519,29 +523,78 @@ class GeneticAlgorithm():
               'Chromossome', self.best_sol.chromossome)
         return self.best_sol.chromossome
                 
-class brain():
-    def __init__(self):
-        self.bias = []
-        self.dues = []
-        self.input_vector = []
-        self.elapsed_time = 0
-        self.current_position = 0
+class brain(nn.Module):
+    
+    def __init__(self, input_size, output_size):
+        super(brain, self).__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        self.fc1 = nn.Linear(self.input_size, self.input_size*3)
+        self.fc2 = nn.Linear(self.input_size*3, self.input_size*2)
+        self.fc3 = nn.Linear(self.input_size*2, self.input_size)
+        self.fc4 = nn.Linear(self.input_size, self.input_size*2)
+        self.fc5 = nn.Linear(self.input_size*2, self.output_size)
         
-    def init_brain(self, tasks, task_dict):
-        for i in tasks:
-            self.dues.append(task_dict[i][3])
-            self.bias.append(1)
-    
-    def inputs(self):
-        for i in range(len(self.dues)-1):
-            self.input_vector.append(self.dues[i]/max(self.dues))
-            self.input_vector.append(self.bias[i]/max(self.bias))
-        self.input_vector.append(self.current_position)
-    
-    def refresh(self, elapsed_time, current_position, task_dict, tasks):
-        self.elapsed_time = elapsed_time
-        self.current_position = current_position
+    def forward(self, state):
+        a = func.relu(self.fc1(state))
+        b = func.relu(self.fc2(a))
+        c = func.relu(self.fc3(b))
+        d = func.relu(self.fc4(c))
+        self.bias = self.fc5(d)
 
-    def neural_net(self):
-        
+class ReplayMem(object):
     
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        
+    def push(self, event):
+        self.memory.append(event)
+        if len(self.memory) > self.capacity:
+            del self.memory[0]
+    
+    def sample(self, batch_size):
+        samples = zip(*rd.sample(self.memory, batch_size))
+        return map(lambda x: Variable(torch.cat(x, 0)), samples)
+
+class Dqn():
+    
+    def __init__(self, task_queue, task_dict, adjacency_matrix, num_load_pt, gamma):
+        self.input_vector = []
+        task_load_dues, move_load, task_unload_dues, move_unload, self.bias = [], [], [], [], []
+        self.current_position = 0
+        for task in task_queue:
+            task_load_dues.append(task_dict[task][3])
+            move_load.append(adjacency_matrix[self.current_position]\
+                        [task_dict[task][0]])
+            task_unload_dues.append(task_dict[task][6])
+            move_unload.append(adjacency_matrix[task_dict[task][2] + num_load_pt]\
+                               [task_dict[task][0]])
+            self.bias.append(1)
+        for i in range(len(task_queue)):
+            self.input_vector.append(task_load_dues[i]/max(task_load_dues))
+            self.input_vector.append(move_load[i]/max(move_load))
+            self.input_vector.append(task_unload_dues[i]/max(task_unload_dues))
+            self.input_vector.append(move_unload[i]/max(move_unload))
+            self.input_vector.append(self.bias[i])
+        self.input_vector.append(self.current_position)
+        self.elapsed_time = 0
+        self.idle_time = 0
+        self.gamma = gamma
+        self.reward_window = []
+        self.model = brain(len(self.input_vector), len(self.bias))
+        self.memory = ReplayMem(100000)
+        self.optimizer = optim.Adam(self.model.parameters(), lr = .001)
+        self.last_state = torch.Tensor(len(self.input_vector)).unsqueeze(0)
+        self.last_bias = self.bias
+        self.last_reward = 0
+    
+    def learn(self, batch_state, batch_next_state, batch_reward, batch_bias):
+        bias = self.model(batch_state).squeeze(1)
+        next_bias = self.model(batch_next_state).detach().max()[0] #needs to be revised for the problem
+        tgt = self.gamma * next_bias + batch_reward
+        td_loss = func.smooth_l1_loss(bias, tgt)
+        self.optimizer.zero_grad()
+        td_loss.backward(retain_variables = True)
+        self.optimizer.step()
+
