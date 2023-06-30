@@ -99,116 +99,114 @@ def order_queue(task_queue, task_order):
     task_queue = [x for _,x in sorted(zip(task_order, task_queue))]
     return task_queue
 
-def do_tasks(curr_pos, warehouse_number, task_queue, adjacency_matrix, tasks_dictionary,
-             elapsed_time, idle_time):
+def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling, 
+         current_position, warehouse_number):
+    idle = idling
     Load = True
-    complete_tasks = []
-    failed_tasks = []
-    time_taken_per_task = []
-    time_start = elapsed_time
-    '''
-    doing the tasks and verifying if they arrived during the intended time windows
-    '''
-    while task_queue != []: #keeps the function running while there are tasks to complete
-        curr_task = task_queue[0]
-        load_pos = tasks_dictionary[curr_task][0]
-        unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
-        loading_time = tasks_dictionary[curr_task][4]
-        unloading_time = tasks_dictionary[curr_task][7]
-        
-        #checking if we should load the product on the AGV
+    time_start_global = elapsed_time
+    i = 0
+    last_i = -1
+    curr_pos = current_position
+    complete, failed, time_taken = [], [], []
+
+    #checking if we should load the product on the AGV
+    while i < len(task_queue):
+        print(i, last_i, failed)
+        if last_i != i:
+            time_start = elapsed_time
+            curr_task = task_queue[i]
+            load_pos = tasks_dictionary[curr_task][0]
+            unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
+            loading_time = tasks_dictionary[curr_task][4]
+            unloading_time = tasks_dictionary[curr_task][7]
+            load_start = tasks_dictionary[curr_task][2] + time_start_global
+            load_end = tasks_dictionary[curr_task][3] + load_start
+            unload_start = tasks_dictionary[curr_task][5] + load_end 
+            unload_end = tasks_dictionary[curr_task][6] + unload_start
         
         if Load == True:
-            load_start = tasks_dictionary[curr_task][2] + elapsed_time
-            load_end = tasks_dictionary[curr_task][3] + load_start
-            move_time = adjacency_matrix[curr_pos][load_pos]
-            elapsed_time = time_start + move_time
         
-            #checking if the AGV arrived before the opening of the load window
-            #if it did it stays there until the opening of the window
-            
+            move_time = adjacency_matrix[curr_pos][load_pos] 
+            elapsed_time += move_time
+        
+        #checking if the AGV arrived before the opening of the load window
+        #if it did it stays there until the opening of the window
+       
             if elapsed_time < load_start:
-                idle_time += load_start - elapsed_time
+                idle += load_start - elapsed_time
                 elapsed_time = load_start
                 elapsed_time += loading_time
-                idle_time += loading_time
+                idle += loading_time
                 curr_pos = load_pos
+                last_i = i
                 Load = False
-            
-            #checking if the AGV arrived during it's intended loading window
-            #if it did the task proceeds as usual
-            
+                
+                #checking if the AGV arrived during it's intended loading window
+                #if it did the task proceeds as usual
+                
             elif elapsed_time >= load_start and elapsed_time <= load_end:
                 elapsed_time += loading_time
-                idle_time += loading_time
+                idle += loading_time
                 curr_pos = load_pos
+                last_i = i
                 Load = False
-            
-            #checking if the AGV failed to arrive during it's time window
-            #if it did it returns to the neutral point (node 0) while adding a 
-            #penalty to it's idling time
-            
+                
+                #checking if the AGV failed to arrive during it's time window
+                #if it did it returns to the neutral point (node 0) while adding a 
+                #penalty to it's score
+                    
             else:
-                idle_time += 99
+                failed.append(task_queue[i])
                 elapsed_time += 2 * move_time
-                failed_tasks.append(task_queue[0])
-                task_queue.pop(0)
-
-        else:
-            unload_start = tasks_dictionary[curr_task][5] + elapsed_time
-            unload_end = tasks_dictionary[curr_task][6] + unload_start
+                i += 1
+                time_taken.append(elapsed_time - time_start)
+        else :
             move_time = adjacency_matrix[unload_pos][curr_pos]
-            elapsed_time = time_start + move_time
-            
-            #checking if the AGV arrived before the opening of the unloading window
-            #if it did it stays there until the opening of the window and add
-            #the time taken to complete the task and the completed tasks to their
-            #respective lists
-            
+            elapsed_time += move_time
+        #checking if the AGV arrived before the opening of the unloading window
+        #if it did it stays there until the opening of the window and add
+        #the time taken to complete the task and the completed tasks to their
+        #respective lists
+        
             if elapsed_time < unload_start:
-                idle_time += unload_start - elapsed_time
+                idle += unload_start - elapsed_time
                 elapsed_time = unload_start
                 elapsed_time += unloading_time
-                idle_time += unloading_time
+                idle += unloading_time
                 curr_pos = unload_pos
-                complete_tasks.append(task_queue[0])
-                task_queue.pop(0)
-                time_taken_per_task.append(elapsed_time-time_start)
-                time_start += elapsed_time
+                i += 1
                 Load = True
+                complete.append(task_queue[i])
+                time_taken.append(elapsed_time - time_start)            
                 
                 
-            #checking if the AGV arrived during it's intended unloading window
-            #if it did the task proceeds as usual and add the time taken to 
-            #complete the task and the completed tasks to their respective lists
-                
+        #checking if the AGV arrived during it's intended unloading window
+        #if it did the task proceeds as usual and add the time taken to 
+        #complete the task and the completed tasks to their respective lists
+        
             elif elapsed_time >= unload_start and elapsed_time <= unload_end:
                 elapsed_time += unloading_time
-                idle_time += unloading_time
+                idle += unloading_time
                 curr_pos = unload_pos
-                complete_tasks.append(task_queue[0])
-                task_queue.pop(0)
-                time_taken_per_task.append(elapsed_time-time_start)
-                time_start += elapsed_time
+                i += 1
                 Load = True
+                complete.append(task_queue[i])
+                time_taken.append(elapsed_time - time_start)            
                 
-            #checking if the AGV failed to arrive during it's time window
-            #if it did it returns to the neutral point (node 0) while adding a 
-            #penalty to it's idling time and adding the current taskt to the 
-            #list of failed tasks
-            
+        #checking if the AGV failed to arrive during it's time window
+        #if it did it returns to the neutral point (node 0) while adding a 
+        #penalty to it's score
+        
             else:
-                idle_time += 99
                 elapsed_time += 2 * move_time + loading_time +\
                     adjacency_matrix[0][load_pos]
-                failed_tasks.append(task_queue[0])
-                task_queue.pop(0)
-                time_start += elapsed_time
+                i += 1
                 curr_pos = 0
                 Load = True
+                failed.append(task_queue[i])
+                time_taken.append(elapsed_time - time_start)
                 
-    return elapsed_time, idle_time, complete_tasks, time_taken_per_task, task_queue, failed_tasks
-
+    return task_queue, idle, elapsed_time, curr_pos, complete, failed, time_taken
 
 def pareto(complete_tasks, time_taken_per_task):
    
@@ -281,6 +279,8 @@ class Individual():
         task_queue = [x for _,x in sorted(zip(self.chromossome, self.tasks))]
         curr_pos = self.current_position
         elapsed_time = self.elapsed_time
+        time_start_global = self.elapsed_time
+        failed = []
 
         while i < len(task_queue): #keeps the function running while going through task queue
             curr_task = task_queue[i]
@@ -288,12 +288,14 @@ class Individual():
             unload_pos = self.tasks_dictionary[curr_task][1] + self.warehouse_number  
             loading_time = self.tasks_dictionary[curr_task][4]
             unloading_time = self.tasks_dictionary[curr_task][7]
-            
+            load_start = self.tasks_dictionary[curr_task][2] + time_start_global
+            load_end = self.tasks_dictionary[curr_task][3] + load_start
+            unload_start = self.tasks_dictionary[curr_task][5] + load_end
+            unload_end = self.tasks_dictionary[curr_task][6] + unload_start
+
             #checking if we should load the product on the AGV
             
             if Load == True:
-                load_start = self.tasks_dictionary[curr_task][2] + elapsed_time
-                load_end = self.tasks_dictionary[curr_task][3] + load_start
                 move_time = self.adjacency_matrix[curr_pos][load_pos] 
                 elapsed_time = time_start + move_time
             
@@ -322,14 +324,12 @@ class Individual():
                 #penalty to it's score
                 
                 else:
-                    idle += 99
                     elapsed_time += 2 * move_time
                     i += 1
+                    failed.append(curr_task)
 
 
             else:
-                unload_start = self.tasks_dictionary[curr_task][5] + elapsed_time
-                unload_end = self.tasks_dictionary[curr_task][6] + unload_start
                 move_time = self.adjacency_matrix[unload_pos][curr_pos]
                 elapsed_time = time_start + move_time
                 #checking if the AGV arrived before the opening of the unloading window
@@ -365,13 +365,16 @@ class Individual():
                 #penalty to it's score
                 
                 else:
-                    idle += 99
                     elapsed_time += 2 * move_time + loading_time +\
                         self.adjacency_matrix[0][load_pos]
                     i += 1
                     time_start += elapsed_time
                     curr_pos = 0
                     Load = True
+                    failed.append(curr_task)
+                    
+        for task in failed:
+            idle += 99
         self.score_evaluation = elapsed_time + idle
 
   #creating the crossover function
@@ -622,7 +625,9 @@ class Dqn():
             print('done')
         else:
             print('no save file found')
-        
+
+def check_brain(self):
+    return os.path.isfile('last_rain.pth')
 
 def create_queue_ordered_unbiased(Task_dictionary, max_task_number, time_slot_duration):
     tasks = []
@@ -808,11 +813,10 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
     return task_queue, idle, elapsed_time, curr_pos, complete, failed
 
             
-def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse_number):
+def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse_number, gamma):
     elapsed_time = 0
     idling = 0
     current_position = 0
-    gamma = .9
     task_q, task_scores = create_queue_ordered_unbiased(Task_dictionary, 20, 240)
     bias = [1] * len(task_q)
     input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
@@ -845,11 +849,35 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
         last_reward -= ((elapsed_time - time_start)/100) - ((idling - last_idle)/ 10)
         t_f = timer()
     Dqn.save()
+    return scores, last_reward
+    
+def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
+                adjacency_matrix, warehouse_number, task_scores, gamma, last_reward,
+                scores):
+    bias = [1] * len(task_queue)
+    input_vector = create_input(task_queue, Task_dictionary, bias, 
+                                current_position, elapsed_time, 
+                                adjacency_matrix, warehouse_number)
+    Dqn(task_queue, Task_dictionary, adjacency_matrix, warehouse_number, 
+        gamma, input_vector, bias, current_position)
+    Dqn.load()
+    bias = Dqn.update(last_reward, input_vector)
+    scores.append(Dqn.score())
+    return bias, scores
+
+def save_reward_and_scores(scores, reward):
+    lines = [scores, reward]
+    with open('last scores and reward.txt', 'w') as f:
+        for line in lines:
+            f.write(line)
+            f.write('\n')
         
-
-
-
-
-
-
-
+def load_reward_and_scores(filename):
+    if os.path.isfile(filename):
+        with open(filename) as f:
+            lines = f.readlines()
+            scores = lines[0]
+            reward = lines[1]
+        return scores, reward
+    else:
+        print('No scores and reward found')
