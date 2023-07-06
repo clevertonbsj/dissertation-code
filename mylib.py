@@ -549,8 +549,9 @@ class ReplayMem(object):
             del self.memory[0]
     
     def sample(self, batch_size):
-        samples = zip(*rd.sample(self.memory, batch_size))
-        return map(lambda x: Variable(torch.cat(x, 0)), samples)
+        print(self.memory, batch_size)
+        samples = torch.Tensor(list(zip(*rd.sample(self.memory, batch_size))))
+        return samples.apply_(lambda x: Variable(torch.cat(x, 0)))
 
 class Dqn():
     
@@ -576,10 +577,12 @@ class Dqn():
         return bias
     
     def learn(self, batch_state, batch_next_state, batch_reward, batch_bias):
+        tgt = []
         bias = self.model(batch_state).squeeze(1)
         next_bias = self.model(batch_next_state).detach()
-        tgt = self.gamma * next_bias + batch_reward
-        td_loss = func.smooth_l1_loss(bias, tgt)
+        for biass in next_bias:
+            tgt.append(self.gamma * biass + batch_reward)
+            td_loss = func.smooth_l1_loss(bias, tgt)
         self.optimizer.zero_grad()
         td_loss.backward(retain_variables = True)
         self.optimizer.step()
@@ -588,10 +591,14 @@ class Dqn():
         new_state = torch.Tensor(last_state).float().unsqueeze(0)
         #print(last_state)
         #print(new_state)
-        self.memory.push((self.last_state, new_state, torch.Tensor(self.last_bias).unsqueeze(0), torch.Tensor([self.last_reward])))
+        self.memory.push((self.last_state, new_state, torch.Tensor(self.last_bias), torch.Tensor([self.last_reward]).unsqueeze(0)))
         self.bias = self.create_bias(new_state)
+        #i=0
         if len(self.memory.memory) > 100:
+            #print(self.memory.memory[100])
+            #print(i)
             batch_state, batch_next_state, batch_reward, batch_bias = self.memory.sample(100)
+            #i+=1
             self.learn(batch_state, batch_next_state, batch_reward, batch_bias)
         self.last_bias = self.bias
         self.last_state = new_state

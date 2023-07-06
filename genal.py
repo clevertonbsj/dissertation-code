@@ -3,9 +3,10 @@
 import networkx as nx
 import mylib as ml
 
-w = int(input('Quantos armazéns gostaria? '))
-d = int(input('Quantos pontos de entrega gostaria? '))
-train = str(input('Gostaria de realizar o treinamento da rede neural? y/n'))
+w = 3#int(input('Quantos armazéns gostaria? '))
+d = 4#int(input('Quantos pontos de entrega gostaria? '))
+#train = str(input('Gostaria de realizar o treinamento da rede neural? y/n'))
+train = 'y'
 if train == 'y' or train == 'Y':
     train = True
 else:
@@ -77,7 +78,7 @@ bias = [1] * len(task_q)
 task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
 
 if train == True:
-    duration = float(input('Por quantas horas gostaria de treinar a rede neural? '))
+    duration = .001#float(input('Por quantas horas gostaria de treinar a rede neural? '))
 
     scores, reward = ml.Train_model(matrix, duration, Tasks, w, .9)
     ml.save_reward_and_scores(scores, reward)
