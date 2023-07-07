@@ -549,9 +549,9 @@ class ReplayMem(object):
             del self.memory[0]
     
     def sample(self, batch_size):
-        print(self.memory, batch_size)
-        samples = torch.Tensor(list(zip(*rd.sample(self.memory, batch_size))))
-        return samples.apply_(lambda x: Variable(torch.cat(x, 0)))
+        samples = list(zip(*rd.sample(self.memory, batch_size)))
+        return map(lambda x: Variable(torch.cat(x, 0)), samples)
+
 
 class Dqn():
     
@@ -577,28 +577,24 @@ class Dqn():
         return bias
     
     def learn(self, batch_state, batch_next_state, batch_reward, batch_bias):
-        tgt = []
         bias = self.model(batch_state).squeeze(1)
         next_bias = self.model(batch_next_state).detach()
-        for biass in next_bias:
-            tgt.append(self.gamma * biass + batch_reward)
-            td_loss = func.smooth_l1_loss(bias, tgt)
+        tgt = self.gamma * next_bias + batch_reward
+        td_loss = func.smooth_l1_loss(bias, tgt)
         self.optimizer.zero_grad()
-        td_loss.backward(retain_variables = True)
+        td_loss.backward(retain_graph = True)
         self.optimizer.step()
 
     def update(self, reward, last_state):
         new_state = torch.Tensor(last_state).float().unsqueeze(0)
-        #print(last_state)
-        #print(new_state)
-        self.memory.push((self.last_state, new_state, torch.Tensor(self.last_bias), torch.Tensor([self.last_reward]).unsqueeze(0)))
+        checker = [1.] * len(self.last_bias)
+        if self.last_bias == checker:
+            self.memory.push((self.last_state, new_state, torch.Tensor(self.last_bias).unsqueeze(0), torch.Tensor([self.last_reward]).unsqueeze(0)))
+        else:
+            self.memory.push((self.last_state, new_state, torch.Tensor(self.last_bias), torch.Tensor([self.last_reward]).unsqueeze(0)))
         self.bias = self.create_bias(new_state)
-        #i=0
         if len(self.memory.memory) > 100:
-            #print(self.memory.memory[100])
-            #print(i)
             batch_state, batch_next_state, batch_reward, batch_bias = self.memory.sample(100)
-            #i+=1
             self.learn(batch_state, batch_next_state, batch_reward, batch_bias)
         self.last_bias = self.bias
         self.last_state = new_state
@@ -855,7 +851,7 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
             last_reward -= 10
         last_reward -= ((elapsed_time - time_start)/100) - ((idling - last_idle)/ 10)
         t_f = timer()
-    Dqn.save()
+    brain.save()
     return scores, last_reward
     
 def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
@@ -867,7 +863,7 @@ def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
                                 adjacency_matrix, warehouse_number)
     brain = Dqn(task_queue, Task_dictionary, adjacency_matrix, warehouse_number, 
         gamma, input_vector, bias, current_position)
-    Dqn.load()
+    brain.load()
     bias = brain.update(last_reward, input_vector)
     scores.append(Dqn.score())
     return bias, scores
@@ -876,7 +872,7 @@ def save_reward_and_scores(scores, reward):
     lines = [scores, reward]
     with open('last scores and reward.txt', 'w') as f:
         for line in lines:
-            f.write(line)
+            f.write(str(line))
             f.write('\n')
         
 def load_reward_and_scores(filename):
