@@ -5,6 +5,9 @@ import mylib as ml
 
 w = 3#int(input('Quantos armazéns gostaria? '))
 d = 4#int(input('Quantos pontos de entrega gostaria? '))
+
+
+
 train = str(input('Gostaria de realizar o treinamento da rede neural? y/n '))
 if train == 'y' or train == 'Y':
     train = True
@@ -47,6 +50,9 @@ if failed2 != []:
 
 for i in failed2:
     idle_time2 -= 99
+
+ml.pareto(complete_tasks2, t_task2)
+
 '''
 
 here will go the code for assigning tasks to multiple agents
@@ -65,7 +71,7 @@ task_q, idle_time, ela_time, curr_pos, complete_tasks, failed, t_task = \
 for i in failed:
     idle_time -= 99
 
-#ml.pareto(complete_tasks, t_task)
+ml.pareto(complete_tasks, t_task)
 if failed != []:
     if len(failed) == 1:
         print('The task', failed[0], 'has failed.')
@@ -75,28 +81,53 @@ if failed != []:
 task_q3 = task_q
 bias = [1] * len(task_q)
 task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
-#while True:
-if train == True:
-    duration = float(input('Por quantas horas gostaria de treinar a rede neural? '))
-    
-    scores, reward = ml.Train_model(matrix, duration, Tasks, w, .9)
-    ml.save_reward_and_scores(scores, reward)
-    train = False
-    print('done trainning')
-'''
-    else:
-        scores, reward = ml.load_reward_and_scores('last scores and reward.txt')
-        bias, scores = ml.create_bias(task_q3, Tasks, start_pos, ela_time, matrix, w,
-                                      task_scores, .9, reward, scores)
-'''
-task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
-#break
+while True:
+    if train == True:
+        #duration = float(input('Por quantas horas gostaria de treinar a rede neural? '))
+        durations = [.167, .334, .5, 3, 4]
+        for i in range(len(durations)):
+            duration = durations[i]
+            scores, reward = ml.Train_model(matrix, duration, Tasks, w, .9)
+            bias, scores = ml.create_bias(task_q3, Tasks, start_pos, ela_time, matrix, w,
+                                          task_scores, .9, reward, scores)
+            task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
+            task_q3, idle_time3, ela_time3, curr_pos3, complete_tasks3, failed3, t_task3 = \
+                ml.Do(matrix, task_q3, Tasks, ela_time, idle_time, start_pos, w)
+            print(task_q3, duration)
+            if failed3 != []:
+                if len(failed3) == 1:
+                    print('The task', failed3[0], 'has failed.')
+                else:
+                    print('A total of', len(failed3), 'tasks failed, they are: ', failed3)
 
-task_q3, idle_time3, ela_time3, curr_pos3, complete_tasks3, failed3, t_task3 = \
-    ml.Do(matrix, task_q3, Tasks, ela_time, idle_time, start_pos, w)
-print(task_q3)
-if failed3 != []:
-    if len(failed3) == 1:
-        print('The task', failed3[0], 'has failed.')
-    else:
-        print('A total of', len(failed3), 'tasks failed, they are: ', failed3)
+            for i in failed3:
+                idle_time3 -= 99
+
+            ml.pareto(complete_tasks3, t_task3)
+            
+        #ml.save_reward_and_scores(scores, reward)
+#        break
+#        train = False
+#        print('done trainning')
+
+#    else:
+        #scores, reward = ml.load_reward_and_scores('last scores and reward.txt')
+#        bias, scores = ml.create_bias(task_q3, Tasks, start_pos, ela_time, matrix, w,
+#                                      task_scores, .9, reward, scores)
+
+#    task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
+#    break
+
+#task_q3, idle_time3, ela_time3, curr_pos3, complete_tasks3, failed3, t_task3 = \
+#    ml.Do(matrix, task_q3, Tasks, ela_time, idle_time, start_pos, w)
+#print(task_q3)
+#if failed3 != []:
+#    if len(failed3) == 1:
+#        print('The task', failed3[0], 'has failed.')
+#    else:
+#        print('A total of', len(failed3), 'tasks failed, they are: ', failed3)
+
+#for i in failed3:
+#    idle_time3 -= 99
+
+#ml.pareto(complete_tasks3, t_task3)

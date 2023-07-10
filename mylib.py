@@ -15,6 +15,22 @@ import torch.nn.functional as func
 import torch.optim as optim
 from torch.autograd import Variable
 from timeit import default_timer as timer
+import pandas as pd
+
+def create_excel(Task_dictionary, file_path, sheetname):
+    tofile = pd.DataFrame(Task_dictionary)
+    tofile.to_excel(file_path, sheet_name=sheetname)
+
+def read_excel(filepath, sheetname):
+    dataframe = pd.read_excel(filepath, sheet_name=sheetname, index_col= 0)
+    tasks = dataframe.to_dict()
+    for i in range(1, len(tasks)+1):
+        task = []
+        for j in range(len(tasks[i])):
+            task.append(tasks[i][j])
+        tasks[i] = task
+    return tasks
+    
 
 def create_graph(warehouse_number, delivery_number):
     '''creating the weighted adjacency matrix and squaring it'''
@@ -728,7 +744,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
     unload_end = tasks_dictionary[curr_task][6] + unload_start
 
     #checking if we should load the product on the AGV
-    while i <=1:
+    while i <1:
         if Load == True:
             move_time = adjacency_matrix[curr_pos][load_pos] 
             elapsed_time += move_time
@@ -761,6 +777,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 idle += 99
                 failed.append(task_queue[0])
                 elapsed_time += 2 * move_time
+                del task_queue[0]
                 break
         else :
             move_time = adjacency_matrix[unload_pos][curr_pos]
@@ -840,6 +857,9 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
         task_q, idling, elapsed_time, current_position, complete, failed =\
         Test(adjacency_matrix, task_q, Task_dictionary, elapsed_time, idling, 
              current_position, warehouse_number, complete, failed)
+        bias = bias[0][0:-1]
+        bias = bias.unsqueeze(0)
+
         task_q, bias, task_scores = add_random_task(task_q, Task_dictionary,
                                                     task_scores, bias)
         task_q, bias, task_scores = order_queue_biased(Task_dictionary, task_q, bias)
@@ -851,7 +871,7 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
             last_reward -= 10
         last_reward -= ((elapsed_time - time_start)/100) - ((idling - last_idle)/ 10)
         t_f = timer()
-    brain.save()
+    #brain.save()
     return scores, last_reward
     
 def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
