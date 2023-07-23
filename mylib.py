@@ -70,7 +70,7 @@ def create_tasks(warehouse_number, delivery_number, Warehouses, Delivery_points)
         '''filling the lists and the dictionary'''
         Load.append(Warehouses[rd.randint(0, len(Warehouses)-1)])
         Unload.append(Delivery_points[rd.randint(0, len(Delivery_points)-1)])
-        Load_t0.append(abs(rd.randint(5, 30)))
+        Load_t0.append(abs(rd.randint(0, 10)))
         Load_tf.append(abs(rd.randint(5, 10)))
         Loading_t.append(abs(rd.randint(1, 5)))
         Unload_t0.append(abs(rd.randint(5, 10)))
@@ -116,8 +116,9 @@ def order_queue(task_queue, task_order):
     return task_queue
 
 def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
-         current_position, warehouse_number):
+         current_position, warehouse_number, trigger):
     idle_task = []
+    start_times = []
     Load = True
     changed = False
     i = 0
@@ -129,7 +130,8 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
         if Load == True:
             if changed == False:
                 time_start_task = elapsed_time
-            time_start = elapsed_time
+                start_times.append(time_start_task)
+            time_start = time_start_task
             curr_task = task_queue[i]
             load_pos = tasks_dictionary[curr_task][0]
             unload_pos = tasks_dictionary[curr_task][1] + warehouse_number  
@@ -137,7 +139,7 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
             unloading_time = tasks_dictionary[curr_task][7]
             load_start = tasks_dictionary[curr_task][2] + time_start_task
             load_end = tasks_dictionary[curr_task][3] + load_start
-            unload_start = tasks_dictionary[curr_task][5] + load_start 
+            unload_start = tasks_dictionary[curr_task][5] + time_start_task 
             unload_end = tasks_dictionary[curr_task][6] + unload_start
             move_time = adjacency_matrix[curr_pos][load_pos] 
             elapsed_time += move_time
@@ -145,8 +147,9 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
             if changed == True:
                 changed = False
             if changed == False:
-                if rd.randint(1, 10) >=9:
+                if trigger[i] >=9:
                     time_start_task = elapsed_time
+                    start_times.append(time_start_task)
                     changed = True
         #checking if the AGV arrived before the opening of the load window
         #if it did it stays there until the opening of the window
@@ -159,8 +162,9 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 curr_pos = load_pos
                 Load = False
                 if changed == False:
-                    if rd.randint(1, 10) >=5:
+                    if trigger[i] >=5:
                         time_start_task = elapsed_time
+                        start_times.append(time_start_task)
                         changed = True
                 
                 #checking if the AGV arrived during it's intended loading window
@@ -172,8 +176,9 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 curr_pos = load_pos
                 Load = False
                 if changed == False:
-                    if rd.randint(1, 10) >=5:
+                    if trigger[i] >=5:
                         time_start_task = elapsed_time
+                        start_times.append(time_start_task)
                         changed = True
                 
                 #checking if the AGV failed to arrive during it's time window
@@ -184,7 +189,7 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 failed.append(task_queue[i])
                 elapsed_time += 2 * move_time
                 i += 1
-                time_taken.append(elapsed_time - time_start)
+
 
         else :
             move_time = adjacency_matrix[unload_pos][curr_pos]
@@ -204,11 +209,12 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 complete.append(task_queue[i])
                 time_taken.append(elapsed_time - time_start)
                 idle_task.append(idle)
-                i += 1
                 if changed == False:
-                    if rd.randint(1, 10) >=3:
+                    if trigger[i] >=3:
                         time_start_task = elapsed_time
+                        start_times.append(time_start_task)
                         changed = True
+                i += 1
                 
                 
         #checking if the AGV arrived during it's intended unloading window
@@ -223,11 +229,12 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 complete.append(task_queue[i])
                 time_taken.append(elapsed_time - time_start)
                 idle_task.append(idle)
-                i += 1
                 if changed == False:
-                    if rd.randint(1, 10) >=3:
+                    if trigger[i] >=3:
                         time_start_task = elapsed_time
+                        start_times.append(time_start_task)
                         changed = True
+                i += 1
                 
         #checking if the AGV failed to arrive during it's time window
         #if it did it returns to the neutral point (node 0) while adding a 
@@ -239,11 +246,10 @@ def Do(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time,
                 curr_pos = 0
                 Load = True
                 failed.append(task_queue[i])
-                time_taken.append(elapsed_time - time_start)
                 i += 1
                 
 
-    return task_queue, idle_task, elapsed_time, curr_pos, complete, failed, time_taken
+    return task_queue, idle_task, elapsed_time, curr_pos, complete, failed, time_taken, start_times
 
 def plot(complete_tasks, time_taken_per_task, idle_time_per_task, Title):
     X_axis = np.arange(len(complete_tasks))
@@ -283,6 +289,7 @@ class Individual():
         self.elapsed_time = elapsed_time
         self.chromossome = []
         
+                
         #creating the initial chromossome with a random task order
         for i in range(len(tasks)):
             self.chromossome.append(i)
@@ -292,7 +299,7 @@ class Individual():
             self.chromossome[i], self.chromossome[rand] = \
                 self.chromossome[rand], self.chromossome[i]
     #creating the fitness function
-    def fitness(self):
+    def fitness(self, trigger):
         idle = 0
         Load = True
         i = 0
@@ -303,6 +310,7 @@ class Individual():
         changed = False
 
         while i < len(task_queue): #keeps the function running while going through task queue
+           # print(trigger,i)
             if changed == False:
                 time_start_task = self.elapsed_time    
             curr_task = task_queue[i]
@@ -312,12 +320,12 @@ class Individual():
             unloading_time = self.tasks_dictionary[curr_task][7]
             load_start = self.tasks_dictionary[curr_task][2] + time_start_task
             load_end = self.tasks_dictionary[curr_task][3] + load_start
-            unload_start = self.tasks_dictionary[curr_task][5] + load_start
+            unload_start = self.tasks_dictionary[curr_task][5] + time_start_task
             unload_end = self.tasks_dictionary[curr_task][6] + unload_start
             if changed == True:
                 changed = False
             if changed == False:
-                if rd.randint(1, 10) >=9:
+                if trigger[i] >=9:
                     time_start_task = elapsed_time
                     changed = True
 
@@ -338,7 +346,7 @@ class Individual():
                     curr_pos = load_pos
                     Load = False
                     if changed == False:
-                        if rd.randint(1, 10) >=5:
+                        if trigger[i] >=5:
                             time_start_task = elapsed_time
                             changed = True
                 
@@ -351,7 +359,7 @@ class Individual():
                     curr_pos = load_pos
                     Load = False
                     if changed == False:
-                        if rd.randint(1, 10) >=5:
+                        if trigger[i] >=5:
                             time_start_task = elapsed_time
                             changed = True
                 
@@ -379,13 +387,12 @@ class Individual():
                     elapsed_time += unloading_time
                     idle += unloading_time
                     curr_pos = unload_pos
-                    i += 1
                     Load = True
                     if changed == False:
-                        if rd.randint(1, 10) >=3:
+                        if trigger[i] >=3:
                             time_start_task = elapsed_time
                             changed = True
-                    
+                    i += 1
                     
                 #checking if the AGV arrived during it's intended unloading window
                 #if it did the task proceeds as usual and add the time taken to 
@@ -395,12 +402,12 @@ class Individual():
                     elapsed_time += unloading_time
                     idle += unloading_time
                     curr_pos = unload_pos
-                    i += 1
                     Load = True
                     if changed == False:
-                        if rd.randint(1, 10) >=3:
+                        if trigger[i] >=3:
                             time_start_task = elapsed_time
                             changed = True
+                    i += 1
                     
                 #checking if the AGV failed to arrive during it's time window
                 #if it did it returns to the neutral point (node 0) while adding a 
@@ -538,12 +545,12 @@ class GeneticAlgorithm():
     #creating the solving function
     def solve(self, mutation_probability, number_of_generations, idle, tasks,
               curr_pos, warehouse_number, adjacency_matrix, tasks_dictionary, 
-              elapsed_time):
+              elapsed_time, trigger):
         
         self.init_pop(idle, tasks, curr_pos, warehouse_number, adjacency_matrix,
                       tasks_dictionary, elapsed_time)
         for individual in self.population:
-            individual.fitness()
+            individual.fitness(trigger)
         self.order_population()
         for generation in range(number_of_generations):
             sum = self.sum_evaluation()
@@ -556,7 +563,7 @@ class GeneticAlgorithm():
                 new_population.append(children[1])
             self.population = new_population
             for individual in self.population:
-                individual.fitness()
+                individual.fitness(trigger)
             self.order_population()
             best = self.population[0]
             self.list_of_solutions.append(best.score_evaluation)
@@ -717,14 +724,15 @@ def order_queue_biased(Task_dictionary, task_queue, bias):
     task_scores.sort(reverse=True)
     return tasks, bias, task_scores
 
-def add_random_task(task_queue, Task_dictionary, task_scores, bias):
+def add_random_task(task_queue, Task_dictionary, task_scores, bias, trigger):
     rand_task = rd.randint(1, len(Task_dictionary))
+    trigger.append(rd.randint(1, 10))
     task_queue.append(rand_task)
     bias = bias.tolist()
     bias = bias[0]
     bias.append(1)
     task_queue, bias, task_scores = order_queue_biased(Task_dictionary, task_queue, bias)
-    return task_queue, bias, task_scores
+    return task_queue, bias, task_scores, trigger
 
 def check_time(elapsed_time, max_window):
     if elapsed_time >= max_window:
@@ -762,8 +770,9 @@ def create_input(task_queue, task_dict, bias, current_position, elapsed_time,
     return input_v
 
 def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling, 
-         current_position, warehouse_number, complete, failed, changed):
+         current_position, warehouse_number, complete, failed, changed, trigger, time_start_task):
     i = 0
+    trigger2 = trigger
     idle = idling
     Load = True
     if changed == False:
@@ -780,6 +789,11 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
     unload_end = tasks_dictionary[curr_task][6] + unload_start
     if changed == True:
         changed = False
+    if changed == False:
+        if trigger2[0] >=9:
+            time_start_task = elapsed_time
+            del trigger2[0]
+            changed = True
 
     #checking if we should load the product on the AGV
     while i <1:
@@ -797,9 +811,11 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 idle += loading_time
                 curr_pos = load_pos
                 Load = False
-                if rd.randint(1, 10) >=5:
-                    time_start_task = elapsed_time
-                    changed = True
+                if changed == False:
+                    if trigger2[0] >=9:
+                        time_start_task = elapsed_time
+                        del trigger2[0]
+                        changed = True
             
             #checking if the AGV arrived during it's intended loading window
             #if it did the task proceeds as usual
@@ -809,9 +825,11 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                     idle += loading_time
                     curr_pos = load_pos
                     Load = False
-                    if rd.randint(1, 10) >=5:
-                        time_start_task = elapsed_time
-                        changed = True
+                    if changed == False:
+                        if trigger2[0] >=9:
+                            time_start_task = elapsed_time
+                            del trigger2[0]
+                            changed = True
         
          #checking if the AGV failed to arrive during it's time window
          #if it did it returns to the neutral point (node 0) while adding a 
@@ -842,8 +860,9 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 complete.append(task_queue[0])
                 del task_queue[0]
                 if changed == False:
-                    if rd.randint(1, 10) >=2:
+                    if trigger2[0] >=9:
                         time_start_task = elapsed_time
+                        del trigger2[0]
                         changed = True
             
                 
@@ -861,8 +880,9 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 complete.append(task_queue[0])
                 del task_queue[0]
                 if changed == False:
-                    if rd.randint(1, 10) >=2:
+                    if trigger2[0] >=9:
                         time_start_task = elapsed_time
+                        del trigger2[0]
                         changed = True
             
                 
@@ -879,13 +899,14 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 failed.append(task_queue[0])
                 del task_queue[0]
     
-    return task_queue, idle, elapsed_time, curr_pos, complete, failed, changed
+    return task_queue, idle, elapsed_time, curr_pos, complete, failed, changed, trigger2, time_start_task
 
             
-def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse_number, gamma):
+def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse_number, gamma, trigger):
     elapsed_time = 0
     idling = 0
     current_position = 0
+    test_trigger = trigger
     complete, failed = [], []
     task_q, task_scores = create_queue_ordered_unbiased(Task_dictionary, 20, 240)
     bias = [1] * len(task_q)
@@ -899,6 +920,7 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
     t_f = 0
     t_i = timer()
     changed = False
+    time_start_task = 0
     while t_f - t_i <= t_d:
         last_state = input_vector
         bias = brain.update(last_reward, last_state)
@@ -907,14 +929,14 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
         time_start = elapsed_time
         last_len_complete = len(complete)
         last_len_failed = len(failed)
-        task_q, idling, elapsed_time, current_position, complete, failed, changed =\
+        task_q, idling, elapsed_time, current_position, complete, failed, changed, test_trigger, time_start_task =\
         Test(adjacency_matrix, task_q, Task_dictionary, elapsed_time, idling, 
-             current_position, warehouse_number, complete, failed, changed)
+             current_position, warehouse_number, complete, failed, changed, test_trigger, time_start_task)
         bias = bias[0][0:-1]
         bias = bias.unsqueeze(0)
 
-        task_q, bias, task_scores = add_random_task(task_q, Task_dictionary,
-                                                    task_scores, bias)
+        task_q, bias, task_scores, test_trigger = add_random_task(task_q, Task_dictionary,
+                                                    task_scores, bias, test_trigger)
         task_q, bias, task_scores = order_queue_biased(Task_dictionary, task_q, bias)
         input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
                                     elapsed_time, adjacency_matrix, warehouse_number)
