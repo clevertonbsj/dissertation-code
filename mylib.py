@@ -274,6 +274,29 @@ def plot(complete_tasks, time_taken_per_task, idle_time_per_task, Title):
     ax.set_ylim(0, 60)
     plt.show()
 
+def newplot(G1, G2, G3, Title, lim):
+    X_axis = np.arange(len(G1))
+    width = .2
+    multiplier = 0
+    fig, ax = plt.subplots(layout = 'constrained')
+    means = {
+        'Earliest Due Date': tuple(G1),
+        'Algortimo Genético': tuple(G2),
+        'Rede Neural + Earliest Due Date': tuple(G3)
+        }
+    for attribute, mean in means.items():
+        offset = width * multiplier
+        rects = ax.bar(X_axis+ offset, mean, width, label = attribute)
+        ax.bar_label(rects, padding = 1)
+        multiplier += 1
+    
+    ax.set_ylabel('Tempo (min)')
+    ax.set_xticks(X_axis + width, range(1, len(G1) + 1))
+    ax.legend(loc = 'upper right', ncols = 2)
+    ax.set_title(Title)
+    ax.set_ylim(0, lim)
+    plt.show()
+    
         
 class Individual():
     def __init__(self, idle, tasks, current_position, warehouse_number, adjacency_matrix,
@@ -963,19 +986,3 @@ def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
     scores.append(brain.score())
     return bias, scores
 
-def save_reward_and_scores(scores, reward):
-    lines = [scores, reward]
-    with open('last scores and reward.txt', 'w') as f:
-        for line in lines:
-            f.write(str(line))
-            f.write('\n')
-        
-def load_reward_and_scores(filename):
-    if os.path.isfile(filename):
-        with open(filename) as f:
-            lines = f.readlines()
-            scores = lines[0]
-            reward = lines[1]
-        return scores, reward
-    else:
-        print('No scores and reward found')
