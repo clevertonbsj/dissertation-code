@@ -789,7 +789,11 @@ def order_queue_biased_ga(task_queue, bias, mut_prob, n_gen, idle_time, start_po
     bias = [x for _,x in sorted(zip(task_scores, bias), reverse=True)]
     task_scores.sort(reverse=True)
     return task_queue, bias, task_scores
-    
+
+def order_queue_biased_pure(task_queue, bias):
+    task_queue = [x for _,x in sorted(zip(bias, task_queue), reverse= True)]
+    bias = sorted(bias, reverse=True)
+    return task_queue, bias
 
 def add_random_task(task_queue, Task_dictionary, task_scores, bias, trigger):
     rand_task = rd.randint(1, len(Task_dictionary))
@@ -817,6 +821,17 @@ def add_random_task_ga(task_queue, Task_dictionary, task_scores, bias, trigger,
                                                           ela_time, trigger,
                                                           pop_size)
     return task_queue, bias, task_scores, trigger
+
+def add_random_task_pure(task_queue, Task_dictionary, bias, trigger):
+    rand_task = rd.randint(1, len(Task_dictionary))
+    trigger.append(rd.randint(1, 10))
+    task_queue.append(rand_task)
+    bias = bias.tolist()
+    bias = bias[0]
+    bias.append(1)
+    task_queue = [x for _,x in sorted(zip(bias, task_queue), reverse= True)]
+    bias = sorted(bias, reverse=True)
+    return task_queue, bias, trigger
 
 def check_time(elapsed_time, max_window):
     if elapsed_time >= max_window:
@@ -896,7 +911,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 curr_pos = load_pos
                 Load = False
                 if changed == False:
-                    if trigger2[0] >=9:
+                    if trigger2[0] >=5:
                         time_start_task = elapsed_time
                         del trigger2[0]
                         changed = True
@@ -910,7 +925,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                     curr_pos = load_pos
                     Load = False
                     if changed == False:
-                        if trigger2[0] >=9:
+                        if trigger2[0] >=5:
                             time_start_task = elapsed_time
                             del trigger2[0]
                             changed = True
@@ -944,7 +959,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 complete.append(task_queue[0])
                 del task_queue[0]
                 if changed == False:
-                    if trigger2[0] >=9:
+                    if trigger2[0] >=3:
                         time_start_task = elapsed_time
                         del trigger2[0]
                         changed = True
@@ -964,7 +979,7 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 complete.append(task_queue[0])
                 del task_queue[0]
                 if changed == False:
-                    if trigger2[0] >=9:
+                    if trigger2[0] >=3:
                         time_start_task = elapsed_time
                         del trigger2[0]
                         changed = True
@@ -983,6 +998,8 @@ def Test(adjacency_matrix, task_queue, tasks_dictionary, elapsed_time, idling,
                 failed.append(task_queue[0])
                 del task_queue[0]
     
+    if changed == False:
+        del trigger2[0]
     return task_queue, idle, elapsed_time, curr_pos, complete, failed, changed, trigger2, time_start_task
 
             
@@ -1013,6 +1030,7 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
         time_start = elapsed_time
         last_len_complete = len(complete)
         last_len_failed = len(failed)
+        print(trigger)
         task_q, idling, elapsed_time, current_position, complete, failed, changed, test_trigger, time_start_task =\
         Test(adjacency_matrix, task_q, Task_dictionary, elapsed_time, idling, 
              current_position, warehouse_number, complete, failed, changed, test_trigger, time_start_task)
@@ -1034,7 +1052,7 @@ def Train_model(adjacency_matrix, trainning_duration, Task_dictionary, warehouse
     return scores, last_reward
     
 def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
-                adjacency_matrix, warehouse_number, task_scores, gamma, last_reward,
+                adjacency_matrix, warehouse_number, gamma, last_reward,
                 scores):
     bias = [1] * len(task_queue)
     input_vector = create_input(task_queue, Task_dictionary, bias, 
@@ -1048,7 +1066,64 @@ def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
     return bias, scores
 
 def Train_model_ga(adjacency_matrix, trainning_duration, Task_dictionary, 
-                   warehouse_number, gamma, trigger, n_gen, pop_size, mut_prob):
+                   warehouse_number, gamma, n_gen, pop_size, mut_prob):
+    elapsed_time = 0
+    idling = 0
+    current_position = 0
+    test_trigger = []
+    complete, failed = [], []
+    task_q, task_scores = create_queue_ordered_unbiased(Task_dictionary, 20, 240)
+    bias = [1] * len(task_q)
+    for i in range(len(task_q)):
+        test_trigger.append(rd.randint(1, 10))
+    input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
+                                elapsed_time, adjacency_matrix, warehouse_number)
+    last_reward = 0
+    scores = []
+    brain = Dqn(task_q, Task_dictionary, adjacency_matrix, warehouse_number, 
+        gamma, input_vector, bias, current_position)
+    t_d = trainning_duration * 3600
+    t_f = 0
+    t_i = timer()
+    changed = False
+    time_start_task = 0
+    while t_f - t_i <= t_d:
+        last_state = input_vector
+        bias = brain.update(last_reward, last_state)
+        scores.append(brain.score())
+        last_idle = idling
+        time_start = elapsed_time
+        last_len_complete = len(complete)
+        last_len_failed = len(failed)
+        task_q, idling, elapsed_time, current_position, complete, failed, changed, test_trigger, time_start_task =\
+        Test(adjacency_matrix, task_q, Task_dictionary, elapsed_time, idling, 
+             current_position, warehouse_number, complete, failed, changed, test_trigger, time_start_task)
+        bias = bias[0][0:-1]
+        bias = bias.unsqueeze(0)
+        
+        
+        task_q, bias, task_scores, test_trigger = add_random_task_ga(task_q, Task_dictionary,
+                                                                     task_scores, bias, test_trigger,
+                                                                     mut_prob, n_gen, idling, 
+                                                                     current_position, warehouse_number, 
+                                                                     adjacency_matrix, elapsed_time, pop_size)
+        task_q, bias, task_scores = order_queue_biased_ga(task_q, bias, mut_prob,
+                                                          n_gen, idling, current_position,
+                                                          warehouse_number, adjacency_matrix,
+                                                          Task_dictionary, elapsed_time, test_trigger, pop_size)
+                
+        input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
+                                    elapsed_time, adjacency_matrix, warehouse_number)
+        if len(complete) > last_len_complete:
+            last_reward += 10
+        if len(failed) > last_len_failed:
+            last_reward -= 10
+        last_reward -= ((elapsed_time - time_start)/100) - ((idling - last_idle)/ 10)
+        t_f = timer()
+    #brain.save()
+    return scores, last_reward
+    
+def Train_model_pure(adjacency_matrix, trainning_duration, Task_dictionary, warehouse_number, gamma, trigger):
     elapsed_time = 0
     idling = 0
     current_position = 0
@@ -1080,15 +1155,10 @@ def Train_model_ga(adjacency_matrix, trainning_duration, Task_dictionary,
              current_position, warehouse_number, complete, failed, changed, test_trigger, time_start_task)
         bias = bias[0][0:-1]
         bias = bias.unsqueeze(0)
-        
-        t_t_i = timer()
 
-        task_q, bias, task_scores, test_trigger = add_random_task_ga(task_q, Task_dictionary, task_scores, bias, trigger, mut_prob, n_gen, idle_time, start_pos, w, matrix, ela_time, pop_size)
-        task_q, bias, task_scores = order_queue_biased_ga(task_queue, bias, mut_prob, n_gen, idle_time, start_pos, w, matrix, Tasks, ela_time, trigger, pop_size)
-        
-        t_t_f = timer()
-        t_d += t_t_f - t_t_i
-        
+        task_q, bias, test_trigger = add_random_task_pure(task_q, Task_dictionary,
+                                                          bias, test_trigger)
+        task_q, bias = order_queue_biased_pure(task_q, bias)
         input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
                                     elapsed_time, adjacency_matrix, warehouse_number)
         if len(complete) > last_len_complete:
@@ -1099,17 +1169,3 @@ def Train_model_ga(adjacency_matrix, trainning_duration, Task_dictionary,
         t_f = timer()
     #brain.save()
     return scores, last_reward
-    
-def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
-                adjacency_matrix, warehouse_number, task_scores, gamma, last_reward,
-                scores):
-    bias = [1] * len(task_queue)
-    input_vector = create_input(task_queue, Task_dictionary, bias, 
-                                current_position, elapsed_time, 
-                                adjacency_matrix, warehouse_number)
-    brain = Dqn(task_queue, Task_dictionary, adjacency_matrix, warehouse_number, 
-        gamma, input_vector, bias, current_position)
-    #brain.load()
-    bias = brain.update(last_reward, input_vector)
-    scores.append(brain.score())
-    return bias, scores

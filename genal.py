@@ -29,7 +29,7 @@ percent_complete_rna_2h = []
 
 #train = str(input('Gostaria de realizar o treinamento da rede neural? y/n '))
 
-for z in range(5):
+for z in range(1):
 
     w = 3
     d = 4
@@ -79,7 +79,7 @@ for z in range(5):
     complete_percent_edd = round(len(complete_tasks2) / len(task_q)+.00000001, 2)
     t_task_edd_mean = round(sum(t_task2)/len(t_task2)+.00000001, 2)
     idle_edd_mean = round(sum(idle_time2)/len(idle_time2)+.00000001, 2)
-    if z == 2 :
+    if z == 0 :
         ml.plot(complete_tasks2, t_task2, idle_time2, 'Earliest Due Date')
         print(task_q2)
         if failed2 != []:
@@ -95,7 +95,7 @@ for z in range(5):
     '''
     #task management
     task_q1 = task_q
-    pop_size, n_gen, mut_prob = 100, 1000, 0.01
+    pop_size, n_gen, mut_prob = 10, 200, 0.01
     ga = ml.GeneticAlgorithm(pop_size)
     task_order = ga.solve(mut_prob, n_gen, idle_time, task_q1, start_pos, w, matrix,
                           Tasks, ela_time, trigger)
@@ -107,7 +107,7 @@ for z in range(5):
     complete_percent_ga = round(len(complete_tasks) / len(task_q), 2)
     t_task_ga_mean = round(sum(t_task)/len(t_task), 2)
     idle_ga_mean = round(sum(idle_time)/len(idle_time), 2)
-    if z == 2 :
+    if z == 0 :
         print(task_q)
         ml.plot(complete_tasks, t_task, idle_time, 'Algoritmo Genético')
         if failed != []:
@@ -119,25 +119,29 @@ for z in range(5):
     
     task_q3 = task_q1
     bias = [1] * len(task_q3)
-    task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
+    #task_q3, bias, task_scores = ml.order_queue_biased_ga(task_q3, bias, 
+    #                                                      mut_prob, n_gen, 
+    #                                                      idle_time, start_pos,
+    #                                                      w, matrix, Tasks, ela_time, 
+    #                                                      trigger, pop_size)
     
     while True:
         if train == True:
             #duration = float(input('Por quantas horas gostaria de treinar a rede neural? '))
-            durations = [.0167, .1503, .334, .5, 1]
+            durations = [.00167]#.0167, .1503, .334, .5, 1]
             for i in range(len(durations)):
                 duration = durations[i]
-                scores, reward = ml.Train_model(matrix, duration, Tasks, w, .9, trigger)
+                scores, reward = ml.Train_model_pure(matrix, duration, Tasks, w, .9, trigger)
                 bias, scores = ml.create_bias(task_q3, Tasks, start_pos, ela_time, matrix, w,
-                                              task_scores, .9, reward, scores)
+                                              .9, reward, scores)
                 bias = bias.squeeze(0).tolist()
-                task_q3, bias, task_scores = ml.order_queue_biased(Tasks, task_q3, bias)
+                task_q3, bias = ml.order_queue_biased_pure(task_q3, bias)
                 task_q3, idle_time3, ela_time3, curr_pos3, complete_tasks3, failed3, t_task3, start_t3 = \
                     ml.Do(matrix, task_q3, Tasks, ela_time, start_pos, w, trigger)
 
                 
                 
-                if z == 2 :
+                if z == 0 :
                     print(task_q3)
                     ml.plot(complete_tasks3, t_task3, idle_time3, 'RNA treinamento = '
                             + str(round(3600*sum(durations[0:i+1]), 2)) + '(s)' + ' = ' 
