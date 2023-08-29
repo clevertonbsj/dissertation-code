@@ -17,8 +17,8 @@ from torch.autograd import Variable
 from timeit import default_timer as timer
 import pandas as pd
 
-def create_excel(Task_dictionary, file_path, sheetname):
-    tofile = pd.DataFrame(Task_dictionary)
+def create_excel(Task_dictionary, file_path, sheetname, indexes):
+    tofile = pd.DataFrame(Task_dictionary, index = indexes)
     tofile.to_excel(file_path, sheet_name=sheetname)
 
 def read_excel(filepath, sheetname):
@@ -285,14 +285,37 @@ def newplot(G1, G2, G3, Title, lim):
         'Rede Neural + Earliest Due Date': tuple(G3)
         }
     for attribute, mean in means.items():
-        offset = width * multiplier
+        offset = (width * multiplier)
         rects = ax.bar(X_axis+ offset, mean, width, label = attribute)
-        ax.bar_label(rects, padding = 1)
-        multiplier += 1
+        ax.bar_label(rects, padding = 1, fontsize = 8)
+        multiplier += 1.5
     
+
     ax.set_ylabel('Tempo (min)')
-    ax.set_xticks(X_axis + width, range(1, len(G1) + 1))
-    ax.legend(loc = 'upper right', ncols = 2)
+    ax.set_xticks(X_axis + width*1.5, range(1, len(G1) + 1))
+    ax.legend(loc = 'upper right', ncols = 1)
+    ax.set_title(Title)
+    ax.set_ylim(0, lim)
+    plt.show()
+
+def newplot2(G1, G2, G3, Title, lim):
+    X_axis = np.arange(len(G1))
+    width = .2
+    multiplier = 0
+    fig, ax = plt.subplots(layout = 'constrained')
+    means = {
+        'Earliest Due Date': tuple(G1),
+        'Algortimo Genético': tuple(G2),
+        'Rede Neural + Earliest Due Date': tuple(G3)
+        }
+    for attribute, mean in means.items():
+        offset = (width * multiplier)
+        rects = ax.bar(X_axis+ offset, mean, width, label = attribute)
+        ax.bar_label(rects, padding = 1, fontsize = 8)
+        multiplier += 1.5
+    
+    ax.set_xticks(X_axis + width*1.5, range(1, len(G1) + 1))
+    ax.legend(loc = 'upper right', ncols = 1)
     ax.set_title(Title)
     ax.set_ylim(0, lim)
     plt.show()
@@ -592,9 +615,9 @@ class GeneticAlgorithm():
             self.list_of_solutions.append(best.score_evaluation)
             self.best_individual(best)
             #print(best.chromossome, best.score_evaluation, best.generation)
-        print('Best Solution - Generation', self.best_sol.generation,
-              'Score', self.best_sol.score_evaluation,
-              'Chromossome', self.best_sol.chromossome)
+        #print('Best Solution - Generation', self.best_sol.generation,
+        #      'Score', self.best_sol.score_evaluation,
+        #      'Chromossome', self.best_sol.chromossome)
         return self.best_sol.chromossome
                 
 class brain(nn.Module):
@@ -739,13 +762,34 @@ def order_queue_biased(Task_dictionary, task_queue, bias):
     bias = [ x for _,x in sorted(zip(task_times, bias))]
     task_times.sort()
     for i in range(len(task_queue)):
-        temp_scores.append((task_times[i]/sum(task_times)))
+        temp_scores.append((task_times[i]/max(task_times)))
     temp_scores.sort(reverse=True)
     for i in range(len(task_queue)):
         task_scores[i] = temp_scores[i] + bias[i]
     tasks = [x for _,x in sorted(zip(task_scores, tasks), reverse= True)]
+    bias = [x for _,x in sorted(zip(task_scores, bias), reverse=True)]
     task_scores.sort(reverse=True)
     return tasks, bias, task_scores
+
+def order_queue_biased_ga(task_queue, bias, mut_prob, n_gen, idle_time, start_pos, w, matrix, 
+                          Tasks, ela_time, trigger, pop_size):
+    task_order = GeneticAlgorithm(pop_size).solve(mut_prob, n_gen, idle_time, task_queue, start_pos, w, matrix,
+                          Tasks, ela_time, trigger)
+    task_queue = [x for _,x in sorted(zip(task_order, task_queue))]
+    bias = [x for _,x in sorted(zip(task_order, bias))]
+    task_scores = []
+    for i in range(len(task_queue)):
+        task_scores.append(i+1)
+    for i in range(len(task_scores)):
+        task_scores[i] = task_scores[i]/max(task_scores)
+    task_scores.sort(reverse=True)
+    for i in range(len(task_scores)):
+        task_scores[i] += bias[i]
+    task_queue = [x for _,x in sorted(zip(task_scores, task_queue), reverse= True)]
+    bias = [x for _,x in sorted(zip(task_scores, bias), reverse=True)]
+    task_scores.sort(reverse=True)
+    return task_queue, bias, task_scores
+    
 
 def add_random_task(task_queue, Task_dictionary, task_scores, bias, trigger):
     rand_task = rd.randint(1, len(Task_dictionary))
@@ -755,6 +799,23 @@ def add_random_task(task_queue, Task_dictionary, task_scores, bias, trigger):
     bias = bias[0]
     bias.append(1)
     task_queue, bias, task_scores = order_queue_biased(Task_dictionary, task_queue, bias)
+    return task_queue, bias, task_scores, trigger
+
+def add_random_task_ga(task_queue, Task_dictionary, task_scores, bias, trigger,
+                       mut_prob, n_gen, idle_time, start_pos, w, matrix, 
+                       ela_time, pop_size):
+    rand_task = rd.randint(1, len(Task_dictionary))
+    trigger.append(rd.randint(1, 10))
+    task_queue.append(rand_task)
+    bias = bias.tolist()
+    bias = bias[0]
+    bias.append(1)
+    task_queue, bias, task_scores = order_queue_biased_ga(task_queue, bias, 
+                                                          mut_prob, n_gen, 
+                                                          idle_time, start_pos, 
+                                                          w, matrix, Task_dictionary,
+                                                          ela_time, trigger,
+                                                          pop_size)
     return task_queue, bias, task_scores, trigger
 
 def check_time(elapsed_time, max_window):
@@ -986,3 +1047,69 @@ def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
     scores.append(brain.score())
     return bias, scores
 
+def Train_model_ga(adjacency_matrix, trainning_duration, Task_dictionary, 
+                   warehouse_number, gamma, trigger, n_gen, pop_size, mut_prob):
+    elapsed_time = 0
+    idling = 0
+    current_position = 0
+    test_trigger = trigger
+    complete, failed = [], []
+    task_q, task_scores = create_queue_ordered_unbiased(Task_dictionary, 20, 240)
+    bias = [1] * len(task_q)
+    input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
+                                elapsed_time, adjacency_matrix, warehouse_number)
+    last_reward = 0
+    scores = []
+    brain = Dqn(task_q, Task_dictionary, adjacency_matrix, warehouse_number, 
+        gamma, input_vector, bias, current_position)
+    t_d = trainning_duration * 3600
+    t_f = 0
+    t_i = timer()
+    changed = False
+    time_start_task = 0
+    while t_f - t_i <= t_d:
+        last_state = input_vector
+        bias = brain.update(last_reward, last_state)
+        scores.append(brain.score())
+        last_idle = idling
+        time_start = elapsed_time
+        last_len_complete = len(complete)
+        last_len_failed = len(failed)
+        task_q, idling, elapsed_time, current_position, complete, failed, changed, test_trigger, time_start_task =\
+        Test(adjacency_matrix, task_q, Task_dictionary, elapsed_time, idling, 
+             current_position, warehouse_number, complete, failed, changed, test_trigger, time_start_task)
+        bias = bias[0][0:-1]
+        bias = bias.unsqueeze(0)
+        
+        t_t_i = timer()
+
+        task_q, bias, task_scores, test_trigger = add_random_task_ga(task_q, Task_dictionary, task_scores, bias, trigger, mut_prob, n_gen, idle_time, start_pos, w, matrix, ela_time, pop_size)
+        task_q, bias, task_scores = order_queue_biased_ga(task_queue, bias, mut_prob, n_gen, idle_time, start_pos, w, matrix, Tasks, ela_time, trigger, pop_size)
+        
+        t_t_f = timer()
+        t_d += t_t_f - t_t_i
+        
+        input_vector = create_input(task_q, Task_dictionary, bias, current_position, 
+                                    elapsed_time, adjacency_matrix, warehouse_number)
+        if len(complete) > last_len_complete:
+            last_reward += 10
+        if len(failed) > last_len_failed:
+            last_reward -= 10
+        last_reward -= ((elapsed_time - time_start)/100) - ((idling - last_idle)/ 10)
+        t_f = timer()
+    #brain.save()
+    return scores, last_reward
+    
+def create_bias(task_queue, Task_dictionary, current_position, elapsed_time,
+                adjacency_matrix, warehouse_number, task_scores, gamma, last_reward,
+                scores):
+    bias = [1] * len(task_queue)
+    input_vector = create_input(task_queue, Task_dictionary, bias, 
+                                current_position, elapsed_time, 
+                                adjacency_matrix, warehouse_number)
+    brain = Dqn(task_queue, Task_dictionary, adjacency_matrix, warehouse_number, 
+        gamma, input_vector, bias, current_position)
+    #brain.load()
+    bias = brain.update(last_reward, input_vector)
+    scores.append(brain.score())
+    return bias, scores
