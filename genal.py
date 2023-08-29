@@ -191,12 +191,11 @@ Dicio = [mean_tt_edd, mean_tt_ga, mean_tt_rna_1min,  mean_tt_rna_10min, mean_tt_
          percent_complete_edd, percent_complete_ga, percent_complete_rna_1min,
          percent_complete_rna_10min, percent_complete_rna_30min, percent_complete_rna_1h,
          percent_complete_rna_2h]
-Dicio_indexes = ['Earliest Due Date', 'Algorítmo Genético', 'AG + RNA treino de 1 min', 'AG + RNA treino de 10 min',
-                 'AG + RNA treino de 30 min', 'AG + RNA treino de 1 h', 'AG + RNA treino de 2 h (TT)', 'Earliest Due Date',
-                  'Algorítmo Genético', 'AG + RNA treino de 1 min', 'AG + RNA treino de 10 min', 'AG + RNA treino de 30 min',
-                  'AG + RNA treino de 1 h', 'AG + RNA treino de 2 h (IT)', 'Earliest Due Date', 'Algorítmo Genético', 
-                  'AG + RNA treino de 1 min', 'AG + RNA treino de 10 min', 'AG + RNA treino de 30 min', 
-                  'AG + RNA treino de 1 h', 'AG + RNA treino de 2 h (%)']
+Dicio_indexes = ['Earliest Due Date', 'Algorítmo Genético', 'RNA treino de 1 min', 'RNA treino de 10 min',
+                 'RNA treino de 30 min', 'RNA treino de 1 h', 'RNA treino de 2 h (TT)', 'Earliest Due Date',
+                  'Algorítmo Genético', 'RNA treino de 1 min', 'RNA treino de 10 min', 'RNA treino de 30 min',
+                  'RNA treino de 1 h', 'RNA treino de 2 h (IT)', 'RNA treino de 1 min', 'RNA treino de 10 min',
+                  'RNA treino de 30 min', 'RNA treino de 1 h', 'RNA treino de 2 h (%)']
 ml.create_excel(Dicio, 'tables/valores graficos.xlsx', 'vals', Dicio_indexes)
 
         #ml.save_reward_and_scores(scores, reward)
